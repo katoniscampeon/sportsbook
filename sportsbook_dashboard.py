@@ -335,11 +335,11 @@ category_mapping = {
     ],
     "Finland": [
         ("oddsapi", "soccer_finland_veikkausliiga", "Finland - Veikkausliiga", "fi"),
-        ("oddsapi", "icehockey_liiga", "Finland - Liiga", "fi")
+        ("oddsapi", "icehockey_liiga", "Finland - Liiga", "fi"),
+        ("espn", "hockey", "usa.nhl", "NHL", "us")
     ],
     "Netherlands": [
-        ("espn", "soccer", "ned.1", "Netherlands - Eredivisie", "nl"),
-        ("espn", "hockey", "usa.nhl", "NHL", "us")
+        ("espn", "soccer", "ned.1", "Netherlands - Eredivisie", "nl")
     ],
     "Sweden": [
         ("espn", "soccer", "swe.1", "Sweden - Allsvenskan", "se")
