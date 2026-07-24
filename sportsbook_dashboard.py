@@ -471,28 +471,37 @@ def add_promo_dialog():
     # Selection type: specific event or championship of the day
     selection_type = st.radio("Επιλογή", ["🏟️ Συγκεκριμένος Αγώνας", "🏆 Πρωτάθλημα της Ημέρας"])
 
-    # Fetch matches for the currently selected day (Top Leagues)
+    # Fetch matches for the currently selected day from ALL leagues in the app
     promo_date = st.session_state.selected_date
-    espn_top_leagues = [
-        ("espn", sport, code, name, flag)
-        for (espn, sport, code, name, flag) in category_mapping["⭐ Top Leagues"]
-    ]
-    top_matches, _ = fetch_all_matches_parallel(espn_top_leagues, promo_date)
+    all_leagues = []
+    seen = set()
+    for leagues in category_mapping.values():
+        for league in leagues:
+            if league[0] == "espn":
+                identifier = ("espn", league[2])
+            else:
+                identifier = ("oddsapi", league[1])
+            if identifier not in seen:
+                all_leagues.append(league)
+                seen.add(identifier)
+
+    odds_api_key = st.session_state.get("odds_api_key", "")
+    all_day_matches, _ = fetch_all_matches_parallel(all_leagues, promo_date, odds_api_key)
 
     if selection_type == "🏟️ Συγκεκριμένος Αγώνας":
         match_options = [
             f"{m['Γηπεδούχος']} vs {m['Φιλοξενούμενος']} ({m['Ώρα']}) — {m['Διοργάνωση']}"
-            for m in top_matches
+            for m in all_day_matches
         ]
         if match_options:
-            selected_match = st.selectbox(f"Αγώνας (Top Leagues — {promo_date.strftime('%d/%m/%Y')})", match_options)
+            selected_match = st.selectbox(f"Αγώνας ({promo_date.strftime('%d/%m/%Y')})", match_options)
         else:
             selected_match = None
-            st.warning(f"Δεν βρέθηκαν αγώνες Top Leagues για {promo_date.strftime('%d/%m/%Y')}.")
+            st.warning(f"Δεν βρέθηκαν αγώνες για {promo_date.strftime('%d/%m/%Y')}.")
         selected_championship = None
     else:
         # Championship of the day: list unique leagues from the fetched matches
-        championship_options = sorted(set(m["Διοργάνωση"] for m in top_matches))
+        championship_options = sorted(set(m["Διοργάνωση"] for m in all_day_matches))
         if championship_options:
             selected_championship = st.selectbox(f"Πρωτάθλημα ({promo_date.strftime('%d/%m/%Y')})", championship_options)
         else:
