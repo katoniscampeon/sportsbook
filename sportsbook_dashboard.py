@@ -161,6 +161,114 @@ def extract_all_match_odds(odds_data):
     return home_odd, draw_odd, away_odd
 
 # -------------------------------------------------------------
+# 2b. THE ODDS API FETCHER (for leagues ESPN doesn't cover)
+# -------------------------------------------------------------
+ODDS_API_BASE = "https://api.the-odds-api.com/v4"
+
+def extract_odds_api_h2h(event, is_hockey=False):
+    """Extract H2H (1X2) odds from The Odds API event response."""
+    odd_1 = "N/A"
+    odd_X = "N/A"
+    odd_2 = "N/A"
+
+    home_team = event.get("home_team", "")
+    away_team = event.get("away_team", "")
+
+    for bookmaker in event.get("bookmakers", []):
+        for market in bookmaker.get("markets", []):
+            if market.get("key") != "h2h":
+                continue
+
+            for outcome in market.get("outcomes", []):
+                name = outcome.get("name", "")
+                price = outcome.get("price")
+
+                if price is not None and float(price) > 1.0:
+                    price_str = f"{float(price):.2f}"
+                else:
+                    price_str = "N/A"
+
+                if name == home_team and odd_1 == "N/A":
+                    odd_1 = price_str
+                elif name == away_team and odd_2 == "N/A":
+                    odd_2 = price_str
+                elif name in ("Draw", "draw") and odd_X == "N/A":
+                    odd_X = price_str
+
+            if odd_1 != "N/A" and odd_2 != "N/A":
+                break
+        if odd_1 != "N/A" and odd_2 != "N/A":
+            break
+
+    if is_hockey:
+        odd_X = "-"
+
+    return odd_1, odd_X, odd_2
+
+@st.cache_data(ttl=300)
+def fetch_odds_api_league(sport_key, league_name, flag_code, target_date, api_key):
+    """Fetch matches from The Odds API for a given sport key."""
+    if not api_key:
+        return []
+
+    url = f"{ODDS_API_BASE}/sports/{sport_key}/odds/"
+    params = {
+        "apiKey": api_key,
+        "regions": "eu",
+        "oddsFormat": "decimal",
+        "dateFormat": "iso"
+    }
+
+    try:
+        response = session.get(url, params=params, timeout=10)
+        if response.status_code == 422:
+            return []  # Sport not in season
+        if response.status_code == 401:
+            return [{"error": "invalid_key"}]
+        if response.status_code == 429:
+            return [{"error": "rate_limit"}]
+        if response.status_code != 200:
+            return []
+
+        events = response.json()
+        is_hockey = "icehockey" in sport_key
+
+        matches = []
+        for event in events:
+            utc_str = event.get("commence_time", "")
+            if not utc_str:
+                continue
+
+            utc_dt = datetime.fromisoformat(utc_str.replace("Z", "+00:00"))
+            athens_dt = utc_dt.astimezone(ZoneInfo("Europe/Athens"))
+
+            match_effective_date = (athens_dt - timedelta(hours=7)).date()
+            if match_effective_date != target_date:
+                continue
+
+            home_team = event.get("home_team", "Home")
+            away_team = event.get("away_team", "Away")
+
+            odd_1, odd_X, odd_2 = extract_odds_api_h2h(event, is_hockey=is_hockey)
+
+            matches.append({
+                "Διοργάνωση": league_name,
+                "Flag": flag_code,
+                "Ώρα": athens_dt.strftime("%H:%M"),
+                "Logo Γηπ.": "",
+                "Γηπεδούχος": home_team,
+                "1": odd_1,
+                "X": odd_X,
+                "2": odd_2,
+                "Logo Φιλ.": "",
+                "Φιλοξενούμενος": away_team
+            })
+        return matches
+    except Exception:
+        pass
+    return []
+
+# -------------------------------------------------------------
 # 3. STATE MANAGEMENT (Athens Time)
 # -------------------------------------------------------------
 athens_tz = ZoneInfo("Europe/Athens")
@@ -190,11 +298,16 @@ def go_today():
 # -------------------------------------------------------------
 # 4. CATEGORY & LEAGUE MAPPINGS
 # -------------------------------------------------------------
+# League tuple format: (source, code, name, flag)
+#   source="espn"     -> code is ESPN league slug (e.g. "eng.1")
+#   source="oddsapi"  -> code is The Odds API sport key (e.g. "soccer_finland_veikkausliiga")
+
 categories_info = [
     {"id": "⭐ Top Leagues", "label": "Top Leagues", "flag": None},
     {"id": "🌐 All", "label": "All", "flag": None},
     {"id": "Germany", "label": "Germany", "flag": "de"},
     {"id": "Norway", "label": "Norway", "flag": "no"},
+    {"id": "Finland", "label": "Finland", "flag": "fi"},
     {"id": "Netherlands", "label": "Netherlands", "flag": "nl"},
     {"id": "Sweden", "label": "Sweden", "flag": "se"},
     {"id": "Filler Leagues", "label": "Filler Leagues", "flag": "un"}
@@ -202,37 +315,44 @@ categories_info = [
 
 category_mapping = {
     "⭐ Top Leagues": [
-        ("soccer", "eng.1", "Premier League", "gb-eng"),
-        ("soccer", "esp.1", "La Liga", "es"),
-        ("soccer", "ger.1", "Bundesliga", "de"),
-        ("soccer", "ita.1", "Serie A", "it"),
-        ("soccer", "uefa.champions", "UEFA Champions League", "eu"),
-        ("soccer", "uefa.europa", "UEFA Europa League", "eu"),
-        ("soccer", "uefa.europa.conf", "UEFA Conference League", "eu"),
-        ("basketball", "usa.nba", "NBA", "us")
+        ("espn", "soccer", "eng.1", "Premier League", "gb-eng"),
+        ("espn", "soccer", "esp.1", "La Liga", "es"),
+        ("espn", "soccer", "ger.1", "Bundesliga", "de"),
+        ("espn", "soccer", "ita.1", "Serie A", "it"),
+        ("espn", "soccer", "uefa.champions", "UEFA Champions League", "eu"),
+        ("espn", "soccer", "uefa.europa", "UEFA Europa League", "eu"),
+        ("espn", "soccer", "uefa.europa.conf", "UEFA Conference League", "eu"),
+        ("espn", "basketball", "usa.nba", "NBA", "us")
     ],
     "Germany": [
-        ("soccer", "ger.1", "Germany - Bundesliga", "de"),
-        ("soccer", "ger.2", "Germany - 2. Bundesliga", "de"),
-        ("soccer", "aut.1", "Austria - Bundesliga", "at"),
-        ("soccer", "tur.1", "Turkey - Süper Lig", "tr")
+        ("espn", "soccer", "ger.1", "Germany - Bundesliga", "de"),
+        ("espn", "soccer", "ger.2", "Germany - 2. Bundesliga", "de"),
+        ("espn", "soccer", "aut.1", "Austria - Bundesliga", "at"),
+        ("espn", "soccer", "tur.1", "Turkey - Süper Lig", "tr")
     ],
     "Norway": [
-        ("soccer", "nor.1", "Norway - Eliteserien", "no")
+        ("espn", "soccer", "nor.1", "Norway - Eliteserien", "no")
+    ],
+    "Finland": [
+        ("oddsapi", "soccer_finland_veikkausliiga", "Finland - Veikkausliiga", "fi"),
+        ("oddsapi", "icehockey_liiga", "Finland - Liiga", "fi")
     ],
     "Netherlands": [
-        ("soccer", "ned.1", "Netherlands - Eredivisie", "nl"),
-        ("hockey", "usa.nhl", "NHL", "us")
+        ("espn", "soccer", "ned.1", "Netherlands - Eredivisie", "nl"),
+        ("espn", "hockey", "usa.nhl", "NHL", "us")
     ],
     "Sweden": [
-        ("soccer", "swe.1", "Sweden - Allsvenskan", "se")
+        ("espn", "soccer", "swe.1", "Sweden - Allsvenskan", "se")
     ],
     "Filler Leagues": [
-        ("soccer", "bra.1", "Brazil - Série A", "br"),
-        ("soccer", "arg.1", "Argentina - Liga Profesional", "ar"),
-        ("soccer", "jpn.1", "Japan - J1 League", "jp")
+        ("espn", "soccer", "bra.1", "Brazil - Série A", "br"),
+        ("espn", "soccer", "arg.1", "Argentina - Liga Profesional", "ar"),
+        ("espn", "soccer", "jpn.1", "Japan - J1 League", "jp")
     ]
 }
+
+# Leagues that use The Odds API (need API key)
+odds_api_categories = ["Finland"]
 
 # -------------------------------------------------------------
 # 5. DATA FETCHING (PARALLELIZED)
@@ -308,18 +428,38 @@ def fetch_single_league(sport, league_code, league_name, flag_code, target_date)
         pass
     return []
 
-def fetch_all_matches_parallel(leagues, target_date):
+def fetch_all_matches_parallel(leagues, target_date, odds_api_key=""):
+    """Fetch matches from multiple leagues in parallel.
+    
+    League tuples can be ESPN format (5 elements starting with "espn")
+    or Odds API format (4 elements starting with "oddsapi").
+    """
     all_matches = []
+    has_odds_api_error = None
+
     with ThreadPoolExecutor(max_workers=8) as executor:
-        futures = [
-            executor.submit(fetch_single_league, sport, code, name, flag, target_date)
-            for sport, code, name, flag in leagues
-        ]
+        futures = {}
+
+        for league in leagues:
+            if league[0] == "espn":
+                # ESPN format: ("espn", sport, code, name, flag)
+                _, sport, code, name, flag = league
+                futures[executor.submit(fetch_single_league, sport, code, name, flag, target_date)] = "espn"
+            elif league[0] == "oddsapi":
+                # Odds API format: ("oddsapi", sport_key, name, flag)
+                _, sport_key, name, flag = league
+                futures[executor.submit(fetch_odds_api_league, sport_key, name, flag, target_date, odds_api_key)] = "oddsapi"
+
         for future in as_completed(futures):
             res = future.result()
-            if res:
+            source = futures[future]
+
+            if source == "oddsapi" and res and isinstance(res, list) and res and isinstance(res[0], dict) and "error" in res[0]:
+                has_odds_api_error = res[0]["error"]
+            elif res:
                 all_matches.extend(res)
-    return all_matches
+
+    return all_matches, has_odds_api_error
 
 # -------------------------------------------------------------
 # 6. PROMO DIALOGS (ADD / VIEW)
@@ -330,7 +470,12 @@ def add_promo_dialog():
 
     # Fetch matches for the currently selected day (Top Leagues)
     promo_date = st.session_state.selected_date
-    top_matches = fetch_all_matches_parallel(category_mapping["⭐ Top Leagues"], promo_date)
+    # Use ESPN-only leagues for promo dropdown
+    espn_top_leagues = [
+        ("espn", sport, code, name, flag)
+        for (espn, sport, code, name, flag) in category_mapping["⭐ Top Leagues"]
+    ]
+    top_matches, _ = fetch_all_matches_parallel(espn_top_leagues, promo_date)
     match_options = [
         f"{m['Γηπεδούχος']} vs {m['Φιλοξενούμενος']} ({m['Ώρα']}) — {m['Διοργάνωση']}"
         for m in top_matches
@@ -427,14 +572,33 @@ for cat in categories_info:
             st.session_state.selected_category = cat_id
             st.rerun()
 
-# Only Add Promo in sidebar (View Promos moved to main area top-right)
+# Promo button in sidebar
 st.sidebar.markdown("---")
 
 if st.sidebar.button("➕ Add Promo", use_container_width=True):
     add_promo_dialog()
 
 # -------------------------------------------------------------
-# 8. LEAGUE FILTERING LOGIC
+# 8. THE ODDS API KEY INPUT
+# -------------------------------------------------------------
+# Show API key input if Finland category is selected or in All
+needs_odds_api = st.session_state.selected_category in (odds_api_categories + ["🌐 All"])
+
+if needs_odds_api:
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("**🔑 The Odds API**")
+    odds_api_key = st.sidebar.text_input(
+        "API Key (για Finland)",
+        value=st.session_state.get("odds_api_key", ""),
+        type="password",
+        key="odds_api_key",
+        help="Δωρεάν κλειδί από https://the-odds-api.com"
+    )
+    if not odds_api_key:
+        st.sidebar.info("ℹ️ Πάρε δωρεάν κλειδί από [the-odds-api.com](https://the-odds-api.com) για αγώνες Φινλανδίας.")
+
+# -------------------------------------------------------------
+# 9. LEAGUE FILTERING LOGIC
 # -------------------------------------------------------------
 selected_cat = st.session_state.selected_category
 
@@ -442,18 +606,23 @@ if selected_cat == "🌐 All":
     leagues_to_fetch = []
     seen_codes = set()
     excluded_categories = ["Filler Leagues"]
-    
+
     for cat_name, leagues in category_mapping.items():
         if cat_name not in excluded_categories:
-            for sport, code, name, flag in leagues:
-                if (sport, code) not in seen_codes:
-                    leagues_to_fetch.append((sport, code, name, flag))
-                    seen_codes.add((sport, code))
+            for league in leagues:
+                # Use the full tuple as identifier
+                if league[0] == "espn":
+                    identifier = ("espn", league[2])  # (source, espn_code)
+                else:
+                    identifier = ("oddsapi", league[1])  # (source, odds_api_key)
+                if identifier not in seen_codes:
+                    leagues_to_fetch.append(league)
+                    seen_codes.add(identifier)
 else:
     leagues_to_fetch = category_mapping[selected_cat]
 
 # -------------------------------------------------------------
-# 9. MAIN DISPLAY
+# 10. MAIN DISPLAY
 # -------------------------------------------------------------
 selected_date = st.session_state.selected_date
 
@@ -473,7 +642,7 @@ with col_promos:
     # Spacer to align with title vertically
     st.write("")
     st.write("")
-    
+
     if st.button(btn_label, key="top_view_promos", use_container_width=True, type="primary"):
         view_promos_dialog()
 
@@ -499,23 +668,42 @@ components.html(f"""
 </script>
 """, height=0)
 
-with st.spinner("Φόρτωση αγώνων..."):
-    all_matches = fetch_all_matches_parallel(leagues_to_fetch, selected_date)
+# Get Odds API key from session state
+odds_api_key = st.session_state.get("odds_api_key", "")
+
+# Check if we need the API key but don't have it
+if needs_odds_api and not odds_api_key:
+    st.warning("⚠️ Η κατηγορία Finland χρειάζεται δωρεάν API key από [The Odds API](https://the-odds-api.com). Βάλε το στο sidebar (αριστερά).")
+    # Still show ESPN leagues if in "All" category
+    if selected_cat == "🌐 All":
+        espn_only = [l for l in leagues_to_fetch if l[0] == "espn"]
+        with st.spinner("Φόρτωση αγώνων (χωρίς Finland)..."):
+            all_matches, _ = fetch_all_matches_parallel(espn_only, selected_date)
+    else:
+        all_matches = []
+else:
+    with st.spinner("Φόρτωση αγώνων..."):
+        all_matches, odds_error = fetch_all_matches_parallel(leagues_to_fetch, selected_date, odds_api_key)
+
+        if odds_error == "invalid_key":
+            st.error("❌ Το API key δεν είναι έγκυρο. Έλεγξε το κλειδί από το the-odds-api.com.")
+        elif odds_error == "rate_limit":
+            st.warning("⚠️ Έχεις ξεπεράσει το όριο requests (500/μήνα). Δοκίμασε αύριο.")
 
 if all_matches:
     df_all = pd.DataFrame(all_matches)
-    
+
     for league_name, group in df_all.groupby("Διοργάνωση", sort=False):
         flag_code = group["Flag"].iloc[0]
         flag_url = f"https://flagcdn.com/24x18/{flag_code}.png"
-        
+
         st.markdown(
-            f"#### <img src='{flag_url}' style='vertical-align: middle; margin-right: 8px;' width='24'> {league_name}", 
+            f"#### <img src='{flag_url}' style='vertical-align: middle; margin-right: 8px;' width='24'> {league_name}",
             unsafe_allow_html=True
         )
-        
+
         display_group = group.drop(columns=["Διοργάνωση", "Flag"])
-        
+
         st.dataframe(
             display_group,
             column_config={
@@ -529,5 +717,5 @@ if all_matches:
             hide_index=True
         )
         st.divider()
-else:
+elif not (needs_odds_api and not odds_api_key):
     st.info(f"Δεν υπάρχουν προγραμματισμένοι αγώνες για την κατηγορία '{selected_cat}' στις {selected_date.strftime('%d/%m/%Y')}.")
