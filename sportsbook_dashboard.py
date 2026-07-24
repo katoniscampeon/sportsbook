@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import requests
 import pandas as pd
 from datetime import datetime, date, timedelta
@@ -194,7 +195,7 @@ categories_info = [
     {"id": "🌐 All", "label": "All", "flag": None},
     {"id": "Germany", "label": "Germany", "flag": "de"},
     {"id": "Norway", "label": "Norway", "flag": "no"},
-    {"id": "Finland", "label": "Finland", "flag": "fi"},
+    {"id": "Netherlands", "label": "Netherlands", "flag": "nl"},
     {"id": "Sweden", "label": "Sweden", "flag": "se"},
     {"id": "Filler Leagues", "label": "Filler Leagues", "flag": "un"}
 ]
@@ -219,10 +220,9 @@ category_mapping = {
     "Norway": [
         ("soccer", "nor.1", "Norway - Eliteserien", "no")
     ],
-    "Finland": [
-        ("soccer", "fin.1", "Finland - Veikkausliiga", "fi"),
-        ("hockey", "usa.nhl", "NHL", "us"),
-        ("hockey", "liiga", "Finland - Liiga", "fi")
+    "Netherlands": [
+        ("soccer", "ned.1", "Netherlands - Eredivisie", "nl"),
+        ("hockey", "usa.nhl", "NHL", "us")
     ],
     "Sweden": [
         ("soccer", "swe.1", "Sweden - Allsvenskan", "se")
@@ -286,7 +286,7 @@ def fetch_single_league(sport, league_code, league_name, flag_code, target_date)
                 odd_1, odd_X, odd_2 = extract_all_match_odds(odds_data)
                 
                 no_draw_sports = ["basketball", "hockey"]
-                no_draw_leagues = ["usa.nba", "usa.nhl", "liiga"]
+                no_draw_leagues = ["usa.nba", "usa.nhl"]
                 
                 if sport in no_draw_sports or league_code in no_draw_leagues:
                     odd_X = "-"
@@ -427,14 +427,11 @@ for cat in categories_info:
             st.session_state.selected_category = cat_id
             st.rerun()
 
-# Promo buttons moved to bottom
+# Only Add Promo in sidebar (View Promos moved to main area top-right)
 st.sidebar.markdown("---")
 
 if st.sidebar.button("➕ Add Promo", use_container_width=True):
     add_promo_dialog()
-
-if st.sidebar.button("👁 View Promo", use_container_width=True):
-    view_promos_dialog()
 
 # -------------------------------------------------------------
 # 8. LEAGUE FILTERING LOGIC
@@ -460,8 +457,47 @@ else:
 # -------------------------------------------------------------
 selected_date = st.session_state.selected_date
 
-st.title("⚽ Sportsbook Dashboard")
-st.subheader(f"📅 Αγώνες για {selected_date.strftime('%d/%m/%Y')} — Κατηγορία: {selected_cat}")
+# Top row: title on the left, View Promos button on the right
+col_title, col_promos = st.columns([8, 2])
+
+with col_title:
+    st.title("⚽ Sportsbook Dashboard")
+    st.subheader(f"📅 Αγώνες για {selected_date.strftime('%d/%m/%Y')} — Κατηγορία: {selected_cat}")
+
+with col_promos:
+    has_promos = len(st.session_state.promos) > 0
+    promo_count = len(st.session_state.promos)
+    btn_label = f"👁 Promos ({promo_count})" if has_promos else "👁 Promos"
+    btn_color = "#28a745" if has_promos else "#dc3545"
+
+    # Spacer to align with title vertically
+    st.write("")
+    st.write("")
+    
+    if st.button(btn_label, key="top_view_promos", use_container_width=True, type="primary"):
+        view_promos_dialog()
+
+# Inject JS to color the View Promos button green/red based on state
+components.html(f"""
+<script>
+    setTimeout(function() {{
+        const buttons = parent.document.querySelectorAll('button');
+        for (const btn of buttons) {{
+            if (btn.textContent.includes('Promos') && !btn.textContent.includes('Add')) {{
+                btn.style.backgroundColor = '{btn_color}';
+                btn.style.borderColor = '{btn_color}';
+                btn.style.color = 'white';
+                btn.addEventListener('mouseenter', function() {{
+                    btn.style.opacity = '0.85';
+                }});
+                btn.addEventListener('mouseleave', function() {{
+                    btn.style.opacity = '1';
+                }});
+            }}
+        }}
+    }}, 200);
+</script>
+""", height=0)
 
 with st.spinner("Φόρτωση αγώνων..."):
     all_matches = fetch_all_matches_parallel(leagues_to_fetch, selected_date)
