@@ -468,24 +468,37 @@ def fetch_all_matches_parallel(leagues, target_date, odds_api_key=""):
 def add_promo_dialog():
     boost_type = st.radio("Τύπος Boost", ["Golden Boost", "Betslip Boost"])
 
+    # Selection type: specific event or championship of the day
+    selection_type = st.radio("Επιλογή", ["🏟️ Συγκεκριμένος Αγώνας", "🏆 Πρωτάθλημα της Ημέρας"])
+
     # Fetch matches for the currently selected day (Top Leagues)
     promo_date = st.session_state.selected_date
-    # Use ESPN-only leagues for promo dropdown
     espn_top_leagues = [
         ("espn", sport, code, name, flag)
         for (espn, sport, code, name, flag) in category_mapping["⭐ Top Leagues"]
     ]
     top_matches, _ = fetch_all_matches_parallel(espn_top_leagues, promo_date)
-    match_options = [
-        f"{m['Γηπεδούχος']} vs {m['Φιλοξενούμενος']} ({m['Ώρα']}) — {m['Διοργάνωση']}"
-        for m in top_matches
-    ]
 
-    if match_options:
-        selected_match = st.selectbox(f"Επιλογή Αγώνα (Top Leagues — {promo_date.strftime('%d/%m/%Y')})", match_options)
+    if selection_type == "🏟️ Συγκεκριμένος Αγώνας":
+        match_options = [
+            f"{m['Γηπεδούχος']} vs {m['Φιλοξενούμενος']} ({m['Ώρα']}) — {m['Διοργάνωση']}"
+            for m in top_matches
+        ]
+        if match_options:
+            selected_match = st.selectbox(f"Αγώνας (Top Leagues — {promo_date.strftime('%d/%m/%Y')})", match_options)
+        else:
+            selected_match = None
+            st.warning(f"Δεν βρέθηκαν αγώνες Top Leagues για {promo_date.strftime('%d/%m/%Y')}.")
+        selected_championship = None
     else:
+        # Championship of the day: list unique leagues from the fetched matches
+        championship_options = sorted(set(m["Διοργάνωση"] for m in top_matches))
+        if championship_options:
+            selected_championship = st.selectbox(f"Πρωτάθλημα ({promo_date.strftime('%d/%m/%Y')})", championship_options)
+        else:
+            selected_championship = None
+            st.warning(f"Δεν βρέθηκαν πρωταθλήματα για {promo_date.strftime('%d/%m/%Y')}.")
         selected_match = None
-        st.warning(f"Δεν βρέθηκαν αγώνες Top Leagues για {promo_date.strftime('%d/%m/%Y')}.")
 
     specification = st.text_area(
         "Specification",
@@ -498,6 +511,7 @@ def add_promo_dialog():
             st.session_state.promos.append({
                 "type": boost_type,
                 "match": selected_match,
+                "championship": selected_championship,
                 "notes": specification,
                 "created": datetime.now(athens_tz).strftime("%d/%m/%Y %H:%M")
             })
@@ -515,12 +529,15 @@ def view_promos_dialog():
             st.markdown(f"**{promo['type']}** &nbsp;·&nbsp; _{promo['created']}_")
             if promo.get("match"):
                 st.markdown(f"🏟️ {promo['match']}")
+            if promo.get("championship"):
+                st.markdown(f"🏆 {promo['championship']}")
             if promo.get("notes"):
                 st.markdown(f"📝 {promo['notes']}")
             if st.button("🗑️ Διαγραφή", key=f"del_promo_{idx}", use_container_width=True):
                 st.session_state.promos.pop(idx)
                 st.rerun()
             st.divider()
+
 
 # -------------------------------------------------------------
 # 7. SIDEBAR CONTROLS
