@@ -31,16 +31,11 @@ st.markdown("""
         section[data-testid="stSidebar"] .stButton > button {
             margin-bottom: 2px;
         }
-        /* Force dataframe team logos to render larger */
+        /* Team logos in dataframe — crisp without breaking alignment */
         [data-testid="stDataFrame"] img {
-            width: 40px !important;
-            height: 40px !important;
+            min-width: 32px;
+            min-height: 32px;
             object-fit: contain;
-        }
-        [data-testid="stDataFrame"] [data-testid="stDataFrameResizable"] [role="gridcell"] [class*="center"] {
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -306,8 +301,8 @@ if all_matches:
         st.dataframe(
             display_group,
             column_config={
-                "Logo Γηπ.": st.column_config.ImageColumn("", width="medium"),
-                "Logo Φιλ.": st.column_config.ImageColumn("", width="medium"),
+                "Logo Γηπ.": st.column_config.ImageColumn("", width="small"),
+                "Logo Φιλ.": st.column_config.ImageColumn("", width="small"),
                 "1": st.column_config.TextColumn("1", width="small"),
                 "X": st.column_config.TextColumn("X", width="small"),
                 "2": st.column_config.TextColumn("2", width="small")
