@@ -21,32 +21,15 @@ st.markdown("""
         .block-container {padding-top: 1rem; padding-bottom: 0rem;}
         h3 {margin-top: 0.5rem;}
 
-        /* Hide the default Streamlit page navigation */
+        /* Hide ONLY the default Streamlit page navigation links */
         [data-testid="stSidebarNav"] { display: none !important; }
 
-        /* Remove extra top padding in sidebar */
-        [data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
-            gap: 0 !important;
-        }
-        [data-testid="stSidebar"] [data-testid="stVerticalBlock"] > div {
-            padding-top: 0.3rem !important;
-            padding-bottom: 0.1rem !important;
-            margin-bottom: 0 !important;
-        }
-        [data-testid="stSidebar"] [data-testid="stSidebarContent"] {
+        /* Slightly reduce sidebar spacing — don't collapse it */
+        [data-testid="stSidebarContent"] {
             padding-top: 1rem !important;
         }
-
-        section[data-testid="stSidebar"] div.stButton {
-            margin-bottom: -10px;
-        }
-        div[data-testid="stHorizontalBlock"] {
-            align-items: center;
-        }
-
-        /* Remove sidebar user info gap */
-        [data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
-            display: none !important;
+        section[data-testid="stSidebar"] .stButton > button {
+            margin-bottom: 2px;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -154,10 +137,10 @@ def view_promos_dialog():
             st.divider()
 
 # -------------------------------------------------------------
-# 5. SIDEBAR — Navigation at very top, tight spacing
+# 5. SIDEBAR — Navigation at very top, then controls
 # -------------------------------------------------------------
-# View toggle — replaces default Streamlit page navigation, at the very top
-view_col1, view_col2 = st.sidebar.columns([1, 1])
+# View toggle — replaces default Streamlit page navigation
+view_col1, view_col2 = st.sidebar.columns(2)
 with view_col1:
     if st.button("⚽ Dashboard", key="nav_dash", use_container_width=True, type="primary"):
         pass  # already on dashboard
@@ -165,13 +148,11 @@ with view_col2:
     if st.button("📅 Calendar", key="nav_cal", use_container_width=True, type="secondary"):
         st.switch_page("pages/Calendar_View.py")
 
-st.sidebar.markdown("")
+st.sidebar.divider()
 
 if st.sidebar.button("🔄 Ανανέωση Δεδομένων", use_container_width=True):
     st.cache_data.clear()
     st.rerun()
-
-st.sidebar.markdown("")
 
 # Date navigation
 if st.sidebar.button("📅 Σήμερα", on_click=go_today, use_container_width=True):
@@ -185,6 +166,7 @@ with date_col2:
 with date_col3:
     st.button("▶", on_click=next_day, use_container_width=True)
 
+st.sidebar.divider()
 st.sidebar.markdown("**🏆 Κατηγορίες**")
 
 for cat in categories_info:
@@ -206,7 +188,7 @@ for cat in categories_info:
             st.session_state.selected_category = cat_id
             st.rerun()
 
-st.sidebar.markdown("")
+st.sidebar.divider()
 if st.sidebar.button("➕ Add Promo", use_container_width=True):
     add_promo_dialog()
 

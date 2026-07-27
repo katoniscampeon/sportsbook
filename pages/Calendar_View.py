@@ -52,22 +52,11 @@ st.markdown("""
             border-radius: 3px; padding: 0 3px; margin-left: 4px;
             font-weight: 700;
         }
-        /* Hide default Streamlit page navigation */
+        /* Hide ONLY default Streamlit page navigation */
         [data-testid="stSidebarNav"] { display: none !important; }
-        /* Tight sidebar spacing */
-        [data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
-            gap: 0 !important;
-        }
-        [data-testid="stSidebar"] [data-testid="stVerticalBlock"] > div {
-            padding-top: 0.3rem !important;
-            padding-bottom: 0.1rem !important;
-            margin-bottom: 0 !important;
-        }
-        [data-testid="stSidebar"] [data-testid="stSidebarContent"] {
+        /* Slightly reduce sidebar spacing */
+        [data-testid="stSidebarContent"] {
             padding-top: 1rem !important;
-        }
-        [data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
-            display: none !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -85,9 +74,9 @@ def get_odds_api_key():
     return st.session_state.get("odds_api_key", "")
 
 # -------------------------------------------------------------
-# SIDEBAR — Navigation at very top, tight spacing
+# SIDEBAR — Navigation at very top
 # -------------------------------------------------------------
-view_col1, view_col2 = st.sidebar.columns([1, 1])
+view_col1, view_col2 = st.sidebar.columns(2)
 with view_col1:
     if st.button("⚽ Dashboard", key="nav_dash", use_container_width=True, type="secondary"):
         st.switch_page("sportsbook_dashboard.py")
@@ -95,7 +84,7 @@ with view_col2:
     if st.button("📅 Calendar", key="nav_cal", use_container_width=True, type="primary"):
         pass  # already on calendar
 
-st.sidebar.markdown("")
+st.sidebar.divider()
 
 st.sidebar.markdown("**Πλοήγηση**")
 if "cal_start_date" not in st.session_state:
@@ -115,7 +104,7 @@ with nav_col3:
         st.session_state.cal_start_date += timedelta(days=7)
         st.rerun()
 
-st.sidebar.markdown("")
+st.sidebar.divider()
 
 # -------------------------------------------------------------
 # INIT STATE
