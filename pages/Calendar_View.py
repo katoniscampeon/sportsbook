@@ -52,11 +52,13 @@ st.markdown("""
             border-radius: 3px; padding: 0 3px; margin-left: 4px;
             font-weight: 700;
         }
+        /* Hide default Streamlit page navigation */
+        [data-testid="stSidebarNav"] { display: none !important; }
     </style>
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------------------
-# ODDS API KEY — from secrets.toml
+# ODDS API KEY
 # -------------------------------------------------------------
 def get_odds_api_key():
     try:
@@ -68,15 +70,39 @@ def get_odds_api_key():
     return st.session_state.get("odds_api_key", "")
 
 # -------------------------------------------------------------
-# VIEW TOGGLE (Dashboard / Calendar)
+# SIDEBAR — View toggle at top
 # -------------------------------------------------------------
-toggle_col1, toggle_col2 = st.columns([1, 1])
-with toggle_col1:
-    if st.button("⚽ Dashboard", use_container_width=True, type="secondary"):
+st.sidebar.markdown("**Navigation**")
+view_col1, view_col2 = st.sidebar.columns(2)
+with view_col1:
+    if st.button("⚽ Dashboard", key="nav_dash", use_container_width=True, type="secondary"):
         st.switch_page("sportsbook_dashboard.py")
-with toggle_col2:
-    if st.button("📅 Calendar View", use_container_width=True, type="primary"):
+with view_col2:
+    if st.button("📅 Calendar", key="nav_cal", use_container_width=True, type="primary"):
         pass  # already on calendar
+
+st.sidebar.markdown("---")
+
+# Navigation buttons (prev/next week)
+st.sidebar.markdown("**Πλοήγηση**")
+if "cal_start_date" not in st.session_state:
+    st.session_state.cal_start_date = effective_today
+
+nav_col1, nav_col2, nav_col3 = st.sidebar.columns([1, 1, 1])
+with nav_col1:
+    if st.button("◀ 7", key="cal_prev", use_container_width=True):
+        st.session_state.cal_start_date -= timedelta(days=7)
+        st.rerun()
+with nav_col2:
+    if st.button("📅 Σήμερα", key="cal_today", use_container_width=True):
+        st.session_state.cal_start_date = effective_today
+        st.rerun()
+with nav_col3:
+    if st.button("7 ▶", key="cal_next", use_container_width=True):
+        st.session_state.cal_start_date += timedelta(days=7)
+        st.rerun()
+
+st.sidebar.markdown("---")
 
 # -------------------------------------------------------------
 # INIT STATE
@@ -86,41 +112,20 @@ if "promos" not in st.session_state:
 
 st.title("📅 Calendar View")
 
-col_slider, col_today, col_nav = st.columns([4, 1, 2])
-with col_slider:
-    num_days = st.slider("Ημέρες", min_value=7, max_value=42, value=21, step=1)
-with col_today:
-    st.write("")
-    if st.button("📅 Σήμερα", use_container_width=True):
-        st.session_state.cal_start_date = effective_today
-        st.rerun()
-
-if "cal_start_date" not in st.session_state:
-    st.session_state.cal_start_date = effective_today
-
 start_date = st.session_state.cal_start_date
+# Load ALL events ahead — 90 days covers the rest of the season
+num_days = 90
 end_date = start_date + timedelta(days=num_days - 1)
 
-with col_nav:
-    col_prev, col_next = st.columns(2)
-    with col_prev:
-        if st.button("◀", use_container_width=True):
-            st.session_state.cal_start_date -= timedelta(days=num_days)
-            st.rerun()
-    with col_next:
-        if st.button("▶", use_container_width=True):
-            st.session_state.cal_start_date += timedelta(days=num_days)
-            st.rerun()
-
-st.markdown(f"**{start_date.strftime('%d/%m/%Y')} — {end_date.strftime('%d/%m/%Y')}**")
+st.markdown(f"**{start_date.strftime('%d/%m/%Y')} — {end_date.strftime('%d/%m/%Y')}** _(90 ημέρες ahead)_")
 
 # -------------------------------------------------------------
-# FETCH ALL MATCHES (excludes Filler Leagues)
+# FETCH ALL MATCHES
 # -------------------------------------------------------------
 odds_api_key = get_odds_api_key()
 all_leagues = get_all_leagues_unique()
 
-with st.spinner("Φόρτωση..."):
+with st.spinner("Φόρτωση όλων των αγώνων..."):
     matches_by_date = fetch_all_matches_for_range(all_leagues, start_date, end_date, odds_api_key)
 
 # -------------------------------------------------------------

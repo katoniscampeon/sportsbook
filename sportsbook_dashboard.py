@@ -20,7 +20,10 @@ st.markdown("""
     <style>
         .block-container {padding-top: 1rem; padding-bottom: 0rem;}
         h3 {margin-top: 0.5rem;}
-        
+
+        /* Hide the default Streamlit page navigation */
+        [data-testid="stSidebarNav"] { display: none !important; }
+
         section[data-testid="stSidebar"] div.stButton {
             margin-bottom: -10px;
         }
@@ -34,7 +37,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------------------
-# 2. ODDS API KEY — from secrets.toml (set once, never asked again)
+# 2. ODDS API KEY
 # -------------------------------------------------------------
 def get_odds_api_key():
     try:
@@ -67,17 +70,15 @@ def go_today():
     st.session_state.selected_date = effective_today
 
 # -------------------------------------------------------------
-# 4. PROMO DIALOGS (ADD / VIEW)
+# 4. PROMO DIALOGS
 # -------------------------------------------------------------
 @st.dialog("➕ Δημιουργία Promo")
 def add_promo_dialog():
     boost_type = st.radio("Τύπος Boost", ["Golden Boost", "Betslip Boost"])
-
     selection_type = st.radio("Επιλογή", ["🏟️ Συγκεκριμένος Αγώνας", "🏆 Πρωτάθλημα της Ημέρας"])
 
     promo_date = st.session_state.selected_date
     all_leagues = get_all_leagues_unique()
-
     odds_api_key = get_odds_api_key()
     all_day_matches, _ = fetch_all_matches_parallel(all_leagues, promo_date, odds_api_key)
 
@@ -101,10 +102,7 @@ def add_promo_dialog():
             st.warning(f"Δεν βρέθηκαν πρωταθλήματα για {promo_date.strftime('%d/%m/%Y')}.")
         selected_match = None
 
-    specification = st.text_area(
-        "Specification",
-        placeholder="Γράψε τις λεπτομέρειες / σημειώσεις του promo..."
-    )
+    specification = st.text_area("Specification", placeholder="Γράψε τις λεπτομέρειες / σημειώσεις του promo...")
 
     col_save, col_cancel = st.columns(2)
     with col_save:
@@ -141,40 +139,36 @@ def view_promos_dialog():
             st.divider()
 
 # -------------------------------------------------------------
-# 5. VIEW TOGGLE (Dashboard / Calendar)
+# 5. SIDEBAR — View toggle at top, then controls
 # -------------------------------------------------------------
-toggle_col1, toggle_col2 = st.columns([1, 1])
-with toggle_col1:
-    if st.button("⚽ Dashboard", use_container_width=True, type="primary"):
+# View toggle replaces default Streamlit page navigation
+st.sidebar.markdown("**Navigation**")
+view_col1, view_col2 = st.sidebar.columns(2)
+with view_col1:
+    if st.button("⚽ Dashboard", key="nav_dash", use_container_width=True, type="primary"):
         pass  # already on dashboard
-with toggle_col2:
-    if st.button("📅 Calendar View", use_container_width=True, type="secondary"):
+with view_col2:
+    if st.button("📅 Calendar", key="nav_cal", use_container_width=True, type="secondary"):
         st.switch_page("pages/Calendar_View.py")
 
-# -------------------------------------------------------------
-# 6. SIDEBAR CONTROLS
-# -------------------------------------------------------------
+st.sidebar.markdown("---")
+
+# Refresh
 if st.sidebar.button("🔄 Ανανέωση Δεδομένων", use_container_width=True):
     st.cache_data.clear()
     st.rerun()
 
 st.sidebar.markdown("---")
 
+# Date navigation
 if st.sidebar.button("📅 Σήμερα", on_click=go_today, use_container_width=True):
     pass
 
 date_col1, date_col2, date_col3 = st.sidebar.columns([1, 3, 1])
-
 with date_col1:
     st.button("◀", on_click=prev_day, use_container_width=True)
-
 with date_col2:
-    st.date_input(
-        "Ημερομηνία",
-        key="selected_date",
-        label_visibility="collapsed"
-    )
-
+    st.date_input("Ημερομηνία", key="selected_date", label_visibility="collapsed")
 with date_col3:
     st.button("▶", on_click=next_day, use_container_width=True)
 
@@ -201,12 +195,11 @@ for cat in categories_info:
             st.rerun()
 
 st.sidebar.markdown("---")
-
 if st.sidebar.button("➕ Add Promo", use_container_width=True):
     add_promo_dialog()
 
 # -------------------------------------------------------------
-# 7. ODDS API KEY — one-time setup
+# 6. ODDS API KEY setup
 # -------------------------------------------------------------
 needs_odds_api = st.session_state.selected_category in (odds_api_categories + ["🌐 All"])
 odds_api_key = get_odds_api_key()
@@ -222,22 +215,20 @@ if needs_odds_api and not odds_api_key:
     )
 
 # -------------------------------------------------------------
-# 8. LEAGUE FILTERING — "All" excludes Filler Leagues
+# 7. LEAGUE FILTERING
 # -------------------------------------------------------------
 selected_cat = st.session_state.selected_category
-
 if selected_cat == "🌐 All":
     leagues_to_fetch = get_all_leagues_unique()
 else:
     leagues_to_fetch = category_mapping[selected_cat]
 
 # -------------------------------------------------------------
-# 9. MAIN DISPLAY
+# 8. MAIN DISPLAY
 # -------------------------------------------------------------
 selected_date = st.session_state.selected_date
 
 col_title, col_promos = st.columns([8, 2])
-
 with col_title:
     st.title("⚽ Sportsbook Dashboard")
     st.subheader(f"📅 Αγώνες για {selected_date.strftime('%d/%m/%Y')} — Κατηγορία: {selected_cat}")
@@ -274,7 +265,7 @@ components.html(f"""
 """, height=0)
 
 # -------------------------------------------------------------
-# 10. DATA FETCH & DISPLAY
+# 9. DATA FETCH & DISPLAY
 # -------------------------------------------------------------
 with st.spinner("Φόρτωση αγώνων..."):
     all_matches, odds_api_error = fetch_all_matches_parallel(leagues_to_fetch, selected_date, odds_api_key)

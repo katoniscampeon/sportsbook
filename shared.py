@@ -32,7 +32,7 @@ LEAGUE_LOGOS = {
     ("espn", "ger.2"): "https://a.espncdn.com/i/leaguelogos/soccer/500/97.png",
     ("espn", "aut.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/5.png",
     ("espn", "tur.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/18.png",
-    ("espn", "nor.1"): "https://www.eliteserien.no/_/image/54a9fcf4-5836-44e1-bdc6-53bdbcc78145:75b5f7adfe53094d5045f745bc36e0c916a4d7fe/-1-1/ES_nettside_840x880_mobil_logopartnerepwa.png",
+    ("espn", "nor.1"): "https://upload.wikimedia.org/wikipedia/en/thumb/5/50/Eliteserien_logo.svg/1280px-Eliteserien_logo.svg.png",
     ("espn", "ned.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/11.png",
     ("espn", "swe.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/16.png",
     ("espn", "bra.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/85.png",
