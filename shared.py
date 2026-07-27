@@ -44,6 +44,12 @@ LEAGUE_LOGOS = {
     ("espn", "usa.nba"): "https://a.espncdn.com/i/teamlogos/leagues/500/nba.png",
     # ESPN hockey
     ("espn", "usa.nhl"): "https://a.espncdn.com/i/teamlogos/leagues/500/nhl.png",
+    # ESPN soccer cups
+    ("espn", "eng.fa"): "https://a.espncdn.com/i/leaguelogos/soccer/500/24.png",
+    ("espn", "ger.dfb_pokal"): "https://a.espncdn.com/i/leaguelogos/soccer/500/84.png",
+    ("espn", "esp.copa_del_rey"): "https://a.espncdn.com/i/leaguelogos/soccer/500/73.png",
+    ("espn", "ita.coppa_italia"): "https://a.espncdn.com/i/leaguelogos/soccer/500/34.png",
+    ("espn", "ned.cup"): "https://a.espncdn.com/i/leaguelogos/soccer/500/197.png",
     # ESPN tennis
     ("espn", "atp"): "https://a.espncdn.com/i/leaguelogos/tennis/500/2.png",
     # Odds API (high-res uploaded logos)
@@ -96,60 +102,67 @@ def sport_from_odds_key(sport_key: str) -> str:
 categories_info = [
     {"id": "⭐ Top Leagues", "label": "Top Leagues", "flag": None},
     {"id": "🌐 All", "label": "All", "flag": None},
-    {"id": "🎾 Tennis", "label": "Tennis", "flag": None},
     {"id": "France", "label": "France", "flag": "fr"},
     {"id": "Germany", "label": "Germany", "flag": "de"},
     {"id": "Norway", "label": "Norway", "flag": "no"},
     {"id": "Finland", "label": "Finland", "flag": "fi"},
     {"id": "Netherlands", "label": "Netherlands", "flag": "nl"},
     {"id": "Sweden", "label": "Sweden", "flag": "se"},
-    {"id": "Filler Leagues", "label": "Filler Leagues", "flag": "un"}
+    {"id": "Filler Leagues", "label": "Filler Leagues", "flag": "un"},
+    {"id": "🎾 Tennis", "label": "Tennis", "flag": None},
 ]
 
 category_mapping = {
     "⭐ Top Leagues": [
         ("espn", "soccer", "eng.1", "Premier League", "gb-eng"),
+        ("espn", "soccer", "eng.fa", "FA Cup", "gb-eng"),
         ("espn", "soccer", "esp.1", "La Liga", "es"),
+        ("espn", "soccer", "esp.copa_del_rey", "Copa del Rey", "es"),
         ("espn", "soccer", "ger.1", "Bundesliga", "de"),
+        ("espn", "soccer", "ger.dfb_pokal", "DFB Pokal", "de"),
         ("espn", "soccer", "ita.1", "Serie A", "it"),
+        ("espn", "soccer", "ita.coppa_italia", "Coppa Italia", "it"),
         ("espn", "soccer", "fra.1", "Ligue 1", "fr"),
+        ("espn", "soccer", "fra.coupe_de_france", "Coupe de France", "fr"),
         ("espn", "soccer", "uefa.champions", "UEFA Champions League", "eu"),
         ("espn", "soccer", "uefa.europa", "UEFA Europa League", "eu"),
         ("espn", "soccer", "uefa.europa.conf", "UEFA Conference League", "eu"),
-        ("espn", "basketball", "usa.nba", "NBA", "us")
-    ],
-    "🎾 Tennis": [
-        ("espn", "tennis", "atp", "ATP Tour", "un"),
+        ("espn", "basketball", "usa.nba", "NBA", "us"),
     ],
     "France": [
         ("espn", "soccer", "fra.1", "France - Ligue 1", "fr"),
-        ("espn", "soccer", "fra.coupe_de_france", "France - Coupe de France", "fr")
+        ("espn", "soccer", "fra.coupe_de_france", "France - Coupe de France", "fr"),
     ],
     "Germany": [
         ("espn", "soccer", "ger.1", "Germany - Bundesliga", "de"),
         ("espn", "soccer", "ger.2", "Germany - 2. Bundesliga", "de"),
+        ("espn", "soccer", "ger.dfb_pokal", "Germany - DFB Pokal", "de"),
         ("espn", "soccer", "aut.1", "Austria - Bundesliga", "at"),
-        ("espn", "soccer", "tur.1", "Turkey - Süper Lig", "tr")
+        ("espn", "soccer", "tur.1", "Turkey - Süper Lig", "tr"),
     ],
     "Norway": [
-        ("espn", "soccer", "nor.1", "Norway - Eliteserien", "no")
+        ("espn", "soccer", "nor.1", "Norway - Eliteserien", "no"),
     ],
     "Finland": [
         ("oddsapi", "soccer_finland_veikkausliiga", "Finland - Veikkausliiga", "fi"),
         ("oddsapi", "icehockey_liiga", "Finland - Liiga", "fi"),
-        ("espn", "hockey", "usa.nhl", "NHL", "us")
+        ("espn", "hockey", "usa.nhl", "NHL", "us"),
     ],
     "Netherlands": [
-        ("espn", "soccer", "ned.1", "Netherlands - Eredivisie", "nl")
+        ("espn", "soccer", "ned.1", "Netherlands - Eredivisie", "nl"),
+        ("espn", "soccer", "ned.cup", "Netherlands - KNVB Beker", "nl"),
     ],
     "Sweden": [
-        ("espn", "soccer", "swe.1", "Sweden - Allsvenskan", "se")
+        ("espn", "soccer", "swe.1", "Sweden - Allsvenskan", "se"),
     ],
     "Filler Leagues": [
         ("espn", "soccer", "bra.1", "Brazil - Série A", "br"),
         ("espn", "soccer", "arg.1", "Argentina - Liga Profesional", "ar"),
-        ("espn", "soccer", "jpn.1", "Japan - J1 League", "jp")
-    ]
+        ("espn", "soccer", "jpn.1", "Japan - J1 League", "jp"),
+    ],
+    "🎾 Tennis": [
+        ("espn", "tennis", "atp", "ATP Tour", "un"),
+    ],
 }
 
 odds_api_categories = ["Finland"]
