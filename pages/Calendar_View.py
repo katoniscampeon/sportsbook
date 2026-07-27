@@ -68,6 +68,17 @@ def get_odds_api_key():
     return st.session_state.get("odds_api_key", "")
 
 # -------------------------------------------------------------
+# VIEW TOGGLE (Dashboard / Calendar)
+# -------------------------------------------------------------
+toggle_col1, toggle_col2 = st.columns([1, 1])
+with toggle_col1:
+    if st.button("⚽ Dashboard", use_container_width=True, type="secondary"):
+        st.switch_page("sportsbook_dashboard.py")
+with toggle_col2:
+    if st.button("📅 Calendar View", use_container_width=True, type="primary"):
+        pass  # already on calendar
+
+# -------------------------------------------------------------
 # INIT STATE
 # -------------------------------------------------------------
 if "promos" not in st.session_state:
@@ -104,7 +115,7 @@ with col_nav:
 st.markdown(f"**{start_date.strftime('%d/%m/%Y')} — {end_date.strftime('%d/%m/%Y')}**")
 
 # -------------------------------------------------------------
-# FETCH ALL MATCHES
+# FETCH ALL MATCHES (excludes Filler Leagues)
 # -------------------------------------------------------------
 odds_api_key = get_odds_api_key()
 all_leagues = get_all_leagues_unique()
@@ -159,7 +170,7 @@ for i in range(num_days):
 
     if unique_champs:
         logos_html = "".join(
-            f'<img src="{logo}" title="{league}">'
+            f'<img src="{logo}" title="{league}" onerror="this.remove()">'
             if logo else f'<span style="font-size:14px">🏆</span>'
             for league, logo in unique_champs.items()
         )

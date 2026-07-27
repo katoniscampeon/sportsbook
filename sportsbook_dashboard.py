@@ -18,7 +18,7 @@ st.set_page_config(page_title="Sportsbook Dashboard", page_icon="⚽", layout="w
 
 st.markdown("""
     <style>
-        .block-container {padding-top: 1.5rem; padding-bottom: 0rem;}
+        .block-container {padding-top: 1rem; padding-bottom: 0rem;}
         h3 {margin-top: 0.5rem;}
         
         section[data-testid="stSidebar"] div.stButton {
@@ -37,7 +37,6 @@ st.markdown("""
 # 2. ODDS API KEY — from secrets.toml (set once, never asked again)
 # -------------------------------------------------------------
 def get_odds_api_key():
-    """Read Odds API key from st.secrets, falling back to session state."""
     try:
         key = st.secrets.get("odds_api_key", "")
         if key:
@@ -142,7 +141,18 @@ def view_promos_dialog():
             st.divider()
 
 # -------------------------------------------------------------
-# 5. SIDEBAR CONTROLS
+# 5. VIEW TOGGLE (Dashboard / Calendar)
+# -------------------------------------------------------------
+toggle_col1, toggle_col2 = st.columns([1, 1])
+with toggle_col1:
+    if st.button("⚽ Dashboard", use_container_width=True, type="primary"):
+        pass  # already on dashboard
+with toggle_col2:
+    if st.button("📅 Calendar View", use_container_width=True, type="secondary"):
+        st.switch_page("pages/Calendar_View.py")
+
+# -------------------------------------------------------------
+# 6. SIDEBAR CONTROLS
 # -------------------------------------------------------------
 if st.sidebar.button("🔄 Ανανέωση Δεδομένων", use_container_width=True):
     st.cache_data.clear()
@@ -150,7 +160,6 @@ if st.sidebar.button("🔄 Ανανέωση Δεδομένων", use_container_w
 
 st.sidebar.markdown("---")
 
-# Today button on top of day navigation
 if st.sidebar.button("📅 Σήμερα", on_click=go_today, use_container_width=True):
     pass
 
@@ -191,14 +200,13 @@ for cat in categories_info:
             st.session_state.selected_category = cat_id
             st.rerun()
 
-# Promo button in sidebar
 st.sidebar.markdown("---")
 
 if st.sidebar.button("➕ Add Promo", use_container_width=True):
     add_promo_dialog()
 
 # -------------------------------------------------------------
-# 6. THE ODDS API KEY — one-time setup via secrets.toml
+# 7. ODDS API KEY — one-time setup
 # -------------------------------------------------------------
 needs_odds_api = st.session_state.selected_category in (odds_api_categories + ["🌐 All"])
 odds_api_key = get_odds_api_key()
@@ -207,14 +215,14 @@ if needs_odds_api and not odds_api_key:
     st.sidebar.markdown("---")
     st.sidebar.markdown("**🔑 The Odds API**")
     st.sidebar.info(
-        "ℹ️ Για αγώνες Φινλανδίας, βάλε το δωρεάν key σου στο αρχείο:\n"
+        "ℹ️ Για αγώνες Φινλανδίας, βάλε το δωρεάν key σου στο:\n"
         "`.streamlit/secrets.toml`\n\n"
         "```\nodds_api_key = \"το_key σου\"\n```\n\n"
-        "Μια φορά μόνο — διαβάζεται αυτόματα. 👉 [the-odds-api.com](https://the-odds-api.com)"
+        "👉 [the-odds-api.com](https://the-odds-api.com)"
     )
 
 # -------------------------------------------------------------
-# 7. LEAGUE FILTERING LOGIC — "All" includes EVERYTHING
+# 8. LEAGUE FILTERING — "All" excludes Filler Leagues
 # -------------------------------------------------------------
 selected_cat = st.session_state.selected_category
 
@@ -224,11 +232,10 @@ else:
     leagues_to_fetch = category_mapping[selected_cat]
 
 # -------------------------------------------------------------
-# 8. MAIN DISPLAY
+# 9. MAIN DISPLAY
 # -------------------------------------------------------------
 selected_date = st.session_state.selected_date
 
-# Top row: title on the left, View Promos button on the right
 col_title, col_promos = st.columns([8, 2])
 
 with col_title:
@@ -267,7 +274,7 @@ components.html(f"""
 """, height=0)
 
 # -------------------------------------------------------------
-# 9. DATA FETCH & DISPLAY
+# 10. DATA FETCH & DISPLAY
 # -------------------------------------------------------------
 with st.spinner("Φόρτωση αγώνων..."):
     all_matches, odds_api_error = fetch_all_matches_parallel(leagues_to_fetch, selected_date, odds_api_key)
@@ -281,21 +288,22 @@ if all_matches:
     df_all = pd.DataFrame(all_matches)
 
     for league_name, group in df_all.groupby("Διοργάνωση", sort=False):
-        flag_code = group["Flag"].iloc[0]
         league_logo = group["League Logo"].iloc[0] if "League Logo" in group.columns else ""
+        flag_code = group["Flag"].iloc[0] if "Flag" in group.columns else ""
 
-        # League header with logo instead of flag
         if league_logo:
             st.markdown(
-                f"#### <img src='{league_logo}' style='vertical-align: middle; margin-right: 8px;' width='28' height='28'> {league_name}",
+                f"#### <img src='{league_logo}' style='vertical-align: middle; margin-right: 8px;' width='28' height='28' onerror=\"this.style.display='none'\"> {league_name}",
                 unsafe_allow_html=True
             )
-        else:
+        elif flag_code:
             flag_url = f"https://flagcdn.com/24x18/{flag_code}.png"
             st.markdown(
                 f"#### <img src='{flag_url}' style='vertical-align: middle; margin-right: 8px;' width='24'> {league_name}",
                 unsafe_allow_html=True
             )
+        else:
+            st.markdown(f"#### {league_name}")
 
         display_group = group.drop(columns=["Διοργάνωση", "Flag", "League Logo"], errors="ignore")
 

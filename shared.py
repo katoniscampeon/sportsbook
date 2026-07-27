@@ -32,7 +32,7 @@ LEAGUE_LOGOS = {
     ("espn", "ger.2"): "https://a.espncdn.com/i/leaguelogos/soccer/500/97.png",
     ("espn", "aut.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/5.png",
     ("espn", "tur.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/18.png",
-    ("espn", "nor.1"): "https://base44.app/api/apps/6a6377d69bbbbbc36ad8c7da/files/mp/public/6a6377d69bbbbbc36ad8c7da/13f7db46c_eliteserien_logo.png",
+    ("espn", "nor.1"): "https://www.eliteserien.no/_/image/54a9fcf4-5836-44e1-bdc6-53bdbcc78145:75b5f7adfe53094d5045f745bc36e0c916a4d7fe/-1-1/ES_nettside_840x880_mobil_logopartnerepwa.png",
     ("espn", "ned.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/11.png",
     ("espn", "swe.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/16.png",
     ("espn", "bra.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/85.png",
@@ -104,12 +104,15 @@ category_mapping = {
 }
 
 odds_api_categories = ["Finland"]
+excluded_from_all = ["Filler Leagues"]
 
 def get_all_leagues_unique():
-    """Return all unique leagues across all categories."""
+    """Return all unique leagues across all categories, excluding Filler Leagues."""
     all_leagues = []
     seen = set()
-    for leagues in category_mapping.values():
+    for cat_name, leagues in category_mapping.items():
+        if cat_name in excluded_from_all:
+            continue
         for league in leagues:
             if league[0] == "espn":
                 identifier = ("espn", league[2])
