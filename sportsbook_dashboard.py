@@ -34,13 +34,26 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------------------
-# 2. STATE MANAGEMENT
+# 2. ODDS API KEY — from secrets.toml (set once, never asked again)
+# -------------------------------------------------------------
+def get_odds_api_key():
+    """Read Odds API key from st.secrets, falling back to session state."""
+    try:
+        key = st.secrets.get("odds_api_key", "")
+        if key:
+            return key
+    except Exception:
+        pass
+    return st.session_state.get("odds_api_key", "")
+
+# -------------------------------------------------------------
+# 3. STATE MANAGEMENT
 # -------------------------------------------------------------
 if "selected_date" not in st.session_state:
     st.session_state.selected_date = effective_today
 
 if "selected_category" not in st.session_state:
-    st.session_state.selected_category = "⭐ Top Leagues"
+    st.session_state.selected_category = "🌐 All"
 
 if "promos" not in st.session_state:
     st.session_state.promos = []
@@ -55,20 +68,18 @@ def go_today():
     st.session_state.selected_date = effective_today
 
 # -------------------------------------------------------------
-# 3. PROMO DIALOGS (ADD / VIEW)
+# 4. PROMO DIALOGS (ADD / VIEW)
 # -------------------------------------------------------------
 @st.dialog("➕ Δημιουργία Promo")
 def add_promo_dialog():
     boost_type = st.radio("Τύπος Boost", ["Golden Boost", "Betslip Boost"])
 
-    # Selection type: specific event or championship of the day
     selection_type = st.radio("Επιλογή", ["🏟️ Συγκεκριμένος Αγώνας", "🏆 Πρωτάθλημα της Ημέρας"])
 
-    # Fetch matches for the currently selected day from ALL leagues in the app
     promo_date = st.session_state.selected_date
     all_leagues = get_all_leagues_unique()
 
-    odds_api_key = st.session_state.get("odds_api_key", "")
+    odds_api_key = get_odds_api_key()
     all_day_matches, _ = fetch_all_matches_parallel(all_leagues, promo_date, odds_api_key)
 
     if selection_type == "🏟️ Συγκεκριμένος Αγώνας":
@@ -83,7 +94,6 @@ def add_promo_dialog():
             st.warning(f"Δεν βρέθηκαν αγώνες για {promo_date.strftime('%d/%m/%Y')}.")
         selected_championship = None
     else:
-        # Championship of the day: list unique leagues from the fetched matches
         championship_options = sorted(set(m["Διοργάνωση"] for m in all_day_matches))
         if championship_options:
             selected_championship = st.selectbox(f"Πρωτάθλημα ({promo_date.strftime('%d/%m/%Y')})", championship_options)
@@ -132,7 +142,7 @@ def view_promos_dialog():
             st.divider()
 
 # -------------------------------------------------------------
-# 4. SIDEBAR CONTROLS
+# 5. SIDEBAR CONTROLS
 # -------------------------------------------------------------
 if st.sidebar.button("🔄 Ανανέωση Δεδομένων", use_container_width=True):
     st.cache_data.clear()
@@ -188,48 +198,33 @@ if st.sidebar.button("➕ Add Promo", use_container_width=True):
     add_promo_dialog()
 
 # -------------------------------------------------------------
-# 5. THE ODDS API KEY INPUT
+# 6. THE ODDS API KEY — one-time setup via secrets.toml
 # -------------------------------------------------------------
 needs_odds_api = st.session_state.selected_category in (odds_api_categories + ["🌐 All"])
+odds_api_key = get_odds_api_key()
 
-if needs_odds_api:
+if needs_odds_api and not odds_api_key:
     st.sidebar.markdown("---")
     st.sidebar.markdown("**🔑 The Odds API**")
-    odds_api_key = st.sidebar.text_input(
-        "API Key (για Finland)",
-        value=st.session_state.get("odds_api_key", ""),
-        type="password",
-        key="odds_api_key",
-        help="Δωρεάν κλειδί από https://the-odds-api.com"
+    st.sidebar.info(
+        "ℹ️ Για αγώνες Φινλανδίας, βάλε το δωρεάν key σου στο αρχείο:\n"
+        "`.streamlit/secrets.toml`\n\n"
+        "```\nodds_api_key = \"το_key σου\"\n```\n\n"
+        "Μια φορά μόνο — διαβάζεται αυτόματα. 👉 [the-odds-api.com](https://the-odds-api.com)"
     )
-    if not odds_api_key:
-        st.sidebar.info("ℹ️ Πάρε δωρεάν κλειδί από [the-odds-api.com](https://the-odds-api.com) για αγώνες Φινλανδίας.")
 
 # -------------------------------------------------------------
-# 6. LEAGUE FILTERING LOGIC
+# 7. LEAGUE FILTERING LOGIC — "All" includes EVERYTHING
 # -------------------------------------------------------------
 selected_cat = st.session_state.selected_category
 
 if selected_cat == "🌐 All":
-    leagues_to_fetch = []
-    seen_codes = set()
-    excluded_categories = ["Filler Leagues"]
-
-    for cat_name, leagues in category_mapping.items():
-        if cat_name not in excluded_categories:
-            for league in leagues:
-                if league[0] == "espn":
-                    identifier = ("espn", league[2])
-                else:
-                    identifier = ("oddsapi", league[1])
-                if identifier not in seen_codes:
-                    leagues_to_fetch.append(league)
-                    seen_codes.add(identifier)
+    leagues_to_fetch = get_all_leagues_unique()
 else:
     leagues_to_fetch = category_mapping[selected_cat]
 
 # -------------------------------------------------------------
-# 7. MAIN DISPLAY
+# 8. MAIN DISPLAY
 # -------------------------------------------------------------
 selected_date = st.session_state.selected_date
 
@@ -246,14 +241,12 @@ with col_promos:
     btn_label = f"👁 Promos ({promo_count})" if has_promos else "👁 Promos"
     btn_color = "#28a745" if has_promos else "#dc3545"
 
-    # Spacer to align with title vertically
     st.write("")
     st.write("")
 
     if st.button(btn_label, key="top_view_promos", use_container_width=True, type="primary"):
         view_promos_dialog()
 
-# Inject JS to color the View Promos button green/red based on state
 components.html(f"""
 <script>
     setTimeout(function() {{
@@ -263,53 +256,48 @@ components.html(f"""
                 btn.style.backgroundColor = '{btn_color}';
                 btn.style.borderColor = '{btn_color}';
                 btn.style.color = 'white';
-                btn.addEventListener('mouseenter', function() {{
-                    btn.style.opacity = '0.85';
-                }});
-                btn.addEventListener('mouseleave', function() {{
-                    btn.style.opacity = '1';
+                btn.addEventListener('click', function() {{
+                    this.style.backgroundColor = '{btn_color}';
+                    this.style.borderColor = '{btn_color}';
                 }});
             }}
         }}
-    }}, 200);
+    }}, 100);
 </script>
 """, height=0)
 
-# Get Odds API key from session state
-odds_api_key = st.session_state.get("odds_api_key", "")
+# -------------------------------------------------------------
+# 9. DATA FETCH & DISPLAY
+# -------------------------------------------------------------
+with st.spinner("Φόρτωση αγώνων..."):
+    all_matches, odds_api_error = fetch_all_matches_parallel(leagues_to_fetch, selected_date, odds_api_key)
 
-# Check if we need the API key but don't have it
-if needs_odds_api and not odds_api_key:
-    st.warning("⚠️ Η κατηγορία Finland χρειάζεται δωρεάν API key από [The Odds API](https://the-odds-api.com). Βάλε το στο sidebar (αριστερά).")
-    # Still show ESPN leagues if in "All" category
-    if selected_cat == "🌐 All":
-        espn_only = [l for l in leagues_to_fetch if l[0] == "espn"]
-        with st.spinner("Φόρτωση αγώνων (χωρίς Finland)..."):
-            all_matches, _ = fetch_all_matches_parallel(espn_only, selected_date)
-    else:
-        all_matches = []
-else:
-    with st.spinner("Φόρτωση αγώνων..."):
-        all_matches, odds_error = fetch_all_matches_parallel(leagues_to_fetch, selected_date, odds_api_key)
-
-        if odds_error == "invalid_key":
-            st.error("❌ Το API key δεν είναι έγκυρο. Έλεγξε το κλειδί από το the-odds-api.com.")
-        elif odds_error == "rate_limit":
-            st.warning("⚠️ Έχεις ξεπεράσει το όριο requests (500/μήνα). Δοκίμασε αύριο.")
+if odds_api_error == "invalid_key":
+    st.error("❌ Το Odds API key δεν είναι έγκυρο. Έλεγξε το `.streamlit/secrets.toml`.")
+elif odds_api_error == "rate_limit":
+    st.warning("⚠️ Όριο κλήσεων Odds API συμπληρώθηκε.")
 
 if all_matches:
     df_all = pd.DataFrame(all_matches)
 
     for league_name, group in df_all.groupby("Διοργάνωση", sort=False):
         flag_code = group["Flag"].iloc[0]
-        flag_url = f"https://flagcdn.com/24x18/{flag_code}.png"
+        league_logo = group["League Logo"].iloc[0] if "League Logo" in group.columns else ""
 
-        st.markdown(
-            f"#### <img src='{flag_url}' style='vertical-align: middle; margin-right: 8px;' width='24'> {league_name}",
-            unsafe_allow_html=True
-        )
+        # League header with logo instead of flag
+        if league_logo:
+            st.markdown(
+                f"#### <img src='{league_logo}' style='vertical-align: middle; margin-right: 8px;' width='28' height='28'> {league_name}",
+                unsafe_allow_html=True
+            )
+        else:
+            flag_url = f"https://flagcdn.com/24x18/{flag_code}.png"
+            st.markdown(
+                f"#### <img src='{flag_url}' style='vertical-align: middle; margin-right: 8px;' width='24'> {league_name}",
+                unsafe_allow_html=True
+            )
 
-        display_group = group.drop(columns=["Διοργάνωση", "Flag"])
+        display_group = group.drop(columns=["Διοργάνωση", "Flag", "League Logo"], errors="ignore")
 
         st.dataframe(
             display_group,
@@ -324,5 +312,5 @@ if all_matches:
             hide_index=True
         )
         st.divider()
-elif not (needs_odds_api and not odds_api_key):
+else:
     st.info(f"Δεν υπάρχουν προγραμματισμένοι αγώνες για την κατηγορία '{selected_cat}' στις {selected_date.strftime('%d/%m/%Y')}.")

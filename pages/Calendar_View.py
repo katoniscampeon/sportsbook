@@ -56,6 +56,18 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------------------
+# ODDS API KEY — from secrets.toml
+# -------------------------------------------------------------
+def get_odds_api_key():
+    try:
+        key = st.secrets.get("odds_api_key", "")
+        if key:
+            return key
+    except Exception:
+        pass
+    return st.session_state.get("odds_api_key", "")
+
+# -------------------------------------------------------------
 # INIT STATE
 # -------------------------------------------------------------
 if "promos" not in st.session_state:
@@ -63,7 +75,6 @@ if "promos" not in st.session_state:
 
 st.title("📅 Calendar View")
 
-# Controls — compact single line
 col_slider, col_today, col_nav = st.columns([4, 1, 2])
 with col_slider:
     num_days = st.slider("Ημέρες", min_value=7, max_value=42, value=21, step=1)
@@ -95,7 +106,7 @@ st.markdown(f"**{start_date.strftime('%d/%m/%Y')} — {end_date.strftime('%d/%m/
 # -------------------------------------------------------------
 # FETCH ALL MATCHES
 # -------------------------------------------------------------
-odds_api_key = st.session_state.get("odds_api_key", "")
+odds_api_key = get_odds_api_key()
 all_leagues = get_all_leagues_unique()
 
 with st.spinner("Φόρτωση..."):
@@ -128,12 +139,10 @@ for i in range(num_days):
     day_name = day_names_gr_short[d.weekday()]
     month_key = (d.month, d.year)
 
-    # Month header when month changes
     if month_key != current_month:
         current_month = month_key
         html_parts.append(f'<div class="cal-month">{month_names_gr[d.month - 1]} {d.year}</div>')
 
-    # Matches & logos for this day
     day_matches = matches_by_date.get(d, [])
     unique_champs = {}
     for m in day_matches:
@@ -142,15 +151,12 @@ for i in range(num_days):
         if league not in unique_champs:
             unique_champs[league] = logo
 
-    # Promos for this day
     day_promos = promos_by_date.get(date_str, [])
     is_today = (d == effective_today)
 
-    # Build date cell
     today_badge = '<span class="cal-today-badge">ΣΗΜΕΡΑ</span>' if is_today else ""
     date_cell = f"{d.day}/{d.month} {day_name}{today_badge}"
 
-    # Build logos cell
     if unique_champs:
         logos_html = "".join(
             f'<img src="{logo}" title="{league}">'
@@ -160,13 +166,12 @@ for i in range(num_days):
     else:
         logos_html = '<span class="cal-empty">—</span>'
 
-    # Build promo cell
     if day_promos:
         promo_parts = []
         for p in day_promos:
             label = p.get("match") or p.get("championship") or "—"
             icon = "🏟️" if p.get("match") else "🏆"
-            promo_parts.append(f"**{p['type']}** {icon} {label}")
+            promo_parts.append(f"<b>{p['type']}</b> {icon} {label}")
             if p.get("notes"):
                 promo_parts.append(f"<span class='cal-empty'>📝 {p['notes']}</span>")
         promo_html = "<br>".join(promo_parts)
