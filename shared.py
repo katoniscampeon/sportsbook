@@ -18,7 +18,7 @@ effective_today = (now_athens - timedelta(hours=7)).date()
 ODDS_API_BASE = "https://api.the-odds-api.com/v4"
 
 # -------------------------------------------------------------
-# LEAGUE LOGOS
+# LEAGUE LOGOS (all high-resolution)
 # -------------------------------------------------------------
 LEAGUE_LOGOS = {
     # ESPN soccer
@@ -26,13 +26,15 @@ LEAGUE_LOGOS = {
     ("espn", "esp.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/15.png",
     ("espn", "ger.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/10.png",
     ("espn", "ita.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/12.png",
+    ("espn", "fra.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/9.png",
+    ("espn", "fra.coupe_de_france"): "https://a.espncdn.com/i/leaguelogos/soccer/500/182.png",
     ("espn", "uefa.champions"): "https://a.espncdn.com/i/leaguelogos/soccer/500/2.png",
     ("espn", "uefa.europa"): "https://a.espncdn.com/i/leaguelogos/soccer/500/2310.png",
     ("espn", "uefa.europa.conf"): "https://a.espncdn.com/i/leaguelogos/soccer/500/20296.png",
     ("espn", "ger.2"): "https://a.espncdn.com/i/leaguelogos/soccer/500/97.png",
     ("espn", "aut.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/5.png",
     ("espn", "tur.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/18.png",
-    ("espn", "nor.1"): "https://upload.wikimedia.org/wikipedia/en/thumb/5/50/Eliteserien_logo.svg/1280px-Eliteserien_logo.svg.png",
+    ("espn", "nor.1"): "https://base44.app/api/apps/6a6377d69bbbbbc36ad8c7da/files/mp/public/6a6377d69bbbbbc36ad8c7da/180ab1032_eliteserien_logo.png",
     ("espn", "ned.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/11.png",
     ("espn", "swe.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/16.png",
     ("espn", "bra.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/85.png",
@@ -42,9 +44,9 @@ LEAGUE_LOGOS = {
     ("espn", "usa.nba"): "https://a.espncdn.com/i/teamlogos/leagues/500/nba.png",
     # ESPN hockey
     ("espn", "usa.nhl"): "https://a.espncdn.com/i/teamlogos/leagues/500/nhl.png",
-    # Odds API (Google favicons as fallback)
-    ("oddsapi", "soccer_finland_veikkausliiga"): "https://www.google.com/s2/favicons?sz=128&domain=veikkausliiga.com",
-    ("oddsapi", "icehockey_liiga"): "https://www.google.com/s2/favicons?sz=128&domain=liiga.fi",
+    # Odds API (high-res uploaded logos)
+    ("oddsapi", "soccer_finland_veikkausliiga"): "https://base44.app/api/apps/6a6377d69bbbbbc36ad8c7da/files/mp/public/6a6377d69bbbbbc36ad8c7da/e11214525_veikkausliiga_logo.png",
+    ("oddsapi", "icehockey_liiga"): "https://base44.app/api/apps/6a6377d69bbbbbc36ad8c7da/files/mp/public/6a6377d69bbbbbc36ad8c7da/b5c79c5c1_liiga_logo.png",
 }
 
 def get_league_logo(source, code):
@@ -57,6 +59,7 @@ def get_league_logo(source, code):
 categories_info = [
     {"id": "⭐ Top Leagues", "label": "Top Leagues", "flag": None},
     {"id": "🌐 All", "label": "All", "flag": None},
+    {"id": "France", "label": "France", "flag": "fr"},
     {"id": "Germany", "label": "Germany", "flag": "de"},
     {"id": "Norway", "label": "Norway", "flag": "no"},
     {"id": "Finland", "label": "Finland", "flag": "fi"},
@@ -71,10 +74,15 @@ category_mapping = {
         ("espn", "soccer", "esp.1", "La Liga", "es"),
         ("espn", "soccer", "ger.1", "Bundesliga", "de"),
         ("espn", "soccer", "ita.1", "Serie A", "it"),
+        ("espn", "soccer", "fra.1", "Ligue 1", "fr"),
         ("espn", "soccer", "uefa.champions", "UEFA Champions League", "eu"),
         ("espn", "soccer", "uefa.europa", "UEFA Europa League", "eu"),
         ("espn", "soccer", "uefa.europa.conf", "UEFA Conference League", "eu"),
         ("espn", "basketball", "usa.nba", "NBA", "us")
+    ],
+    "France": [
+        ("espn", "soccer", "fra.1", "France - Ligue 1", "fr"),
+        ("espn", "soccer", "fra.coupe_de_france", "France - Coupe de France", "fr")
     ],
     "Germany": [
         ("espn", "soccer", "ger.1", "Germany - Bundesliga", "de"),

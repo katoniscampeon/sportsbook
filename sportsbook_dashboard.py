@@ -24,14 +24,29 @@ st.markdown("""
         /* Hide the default Streamlit page navigation */
         [data-testid="stSidebarNav"] { display: none !important; }
 
+        /* Remove extra top padding in sidebar */
+        [data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
+            gap: 0 !important;
+        }
+        [data-testid="stSidebar"] [data-testid="stVerticalBlock"] > div {
+            padding-top: 0.3rem !important;
+            padding-bottom: 0.1rem !important;
+            margin-bottom: 0 !important;
+        }
+        [data-testid="stSidebar"] [data-testid="stSidebarContent"] {
+            padding-top: 1rem !important;
+        }
+
         section[data-testid="stSidebar"] div.stButton {
             margin-bottom: -10px;
         }
-        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] > div {
-            gap: 0.3rem !important;
-        }
         div[data-testid="stHorizontalBlock"] {
             align-items: center;
+        }
+
+        /* Remove sidebar user info gap */
+        [data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
+            display: none !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -139,11 +154,10 @@ def view_promos_dialog():
             st.divider()
 
 # -------------------------------------------------------------
-# 5. SIDEBAR — View toggle at top, then controls
+# 5. SIDEBAR — Navigation at very top, tight spacing
 # -------------------------------------------------------------
-# View toggle replaces default Streamlit page navigation
-st.sidebar.markdown("**Navigation**")
-view_col1, view_col2 = st.sidebar.columns(2)
+# View toggle — replaces default Streamlit page navigation, at the very top
+view_col1, view_col2 = st.sidebar.columns([1, 1])
 with view_col1:
     if st.button("⚽ Dashboard", key="nav_dash", use_container_width=True, type="primary"):
         pass  # already on dashboard
@@ -151,14 +165,13 @@ with view_col2:
     if st.button("📅 Calendar", key="nav_cal", use_container_width=True, type="secondary"):
         st.switch_page("pages/Calendar_View.py")
 
-st.sidebar.markdown("---")
+st.sidebar.markdown("")
 
-# Refresh
 if st.sidebar.button("🔄 Ανανέωση Δεδομένων", use_container_width=True):
     st.cache_data.clear()
     st.rerun()
 
-st.sidebar.markdown("---")
+st.sidebar.markdown("")
 
 # Date navigation
 if st.sidebar.button("📅 Σήμερα", on_click=go_today, use_container_width=True):
@@ -172,7 +185,6 @@ with date_col2:
 with date_col3:
     st.button("▶", on_click=next_day, use_container_width=True)
 
-st.sidebar.markdown("---")
 st.sidebar.markdown("**🏆 Κατηγορίες**")
 
 for cat in categories_info:
@@ -194,7 +206,7 @@ for cat in categories_info:
             st.session_state.selected_category = cat_id
             st.rerun()
 
-st.sidebar.markdown("---")
+st.sidebar.markdown("")
 if st.sidebar.button("➕ Add Promo", use_container_width=True):
     add_promo_dialog()
 
@@ -205,7 +217,7 @@ needs_odds_api = st.session_state.selected_category in (odds_api_categories + ["
 odds_api_key = get_odds_api_key()
 
 if needs_odds_api and not odds_api_key:
-    st.sidebar.markdown("---")
+    st.sidebar.markdown("")
     st.sidebar.markdown("**🔑 The Odds API**")
     st.sidebar.info(
         "ℹ️ Για αγώνες Φινλανδίας, βάλε το δωρεάν key σου στο:\n"

@@ -54,6 +54,21 @@ st.markdown("""
         }
         /* Hide default Streamlit page navigation */
         [data-testid="stSidebarNav"] { display: none !important; }
+        /* Tight sidebar spacing */
+        [data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
+            gap: 0 !important;
+        }
+        [data-testid="stSidebar"] [data-testid="stVerticalBlock"] > div {
+            padding-top: 0.3rem !important;
+            padding-bottom: 0.1rem !important;
+            margin-bottom: 0 !important;
+        }
+        [data-testid="stSidebar"] [data-testid="stSidebarContent"] {
+            padding-top: 1rem !important;
+        }
+        [data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
+            display: none !important;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -70,10 +85,9 @@ def get_odds_api_key():
     return st.session_state.get("odds_api_key", "")
 
 # -------------------------------------------------------------
-# SIDEBAR — View toggle at top
+# SIDEBAR — Navigation at very top, tight spacing
 # -------------------------------------------------------------
-st.sidebar.markdown("**Navigation**")
-view_col1, view_col2 = st.sidebar.columns(2)
+view_col1, view_col2 = st.sidebar.columns([1, 1])
 with view_col1:
     if st.button("⚽ Dashboard", key="nav_dash", use_container_width=True, type="secondary"):
         st.switch_page("sportsbook_dashboard.py")
@@ -81,9 +95,8 @@ with view_col2:
     if st.button("📅 Calendar", key="nav_cal", use_container_width=True, type="primary"):
         pass  # already on calendar
 
-st.sidebar.markdown("---")
+st.sidebar.markdown("")
 
-# Navigation buttons (prev/next week)
 st.sidebar.markdown("**Πλοήγηση**")
 if "cal_start_date" not in st.session_state:
     st.session_state.cal_start_date = effective_today
@@ -102,7 +115,7 @@ with nav_col3:
         st.session_state.cal_start_date += timedelta(days=7)
         st.rerun()
 
-st.sidebar.markdown("---")
+st.sidebar.markdown("")
 
 # -------------------------------------------------------------
 # INIT STATE
@@ -113,7 +126,6 @@ if "promos" not in st.session_state:
 st.title("📅 Calendar View")
 
 start_date = st.session_state.cal_start_date
-# Load ALL events ahead — 90 days covers the rest of the season
 num_days = 90
 end_date = start_date + timedelta(days=num_days - 1)
 
