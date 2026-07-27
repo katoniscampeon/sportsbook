@@ -18,6 +18,40 @@ effective_today = (now_athens - timedelta(hours=7)).date()
 ODDS_API_BASE = "https://api.the-odds-api.com/v4"
 
 # -------------------------------------------------------------
+# LEAGUE LOGOS
+# -------------------------------------------------------------
+LEAGUE_LOGOS = {
+    # ESPN soccer
+    ("espn", "eng.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/23.png",
+    ("espn", "esp.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/15.png",
+    ("espn", "ger.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/10.png",
+    ("espn", "ita.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/12.png",
+    ("espn", "uefa.champions"): "https://a.espncdn.com/i/leaguelogos/soccer/500/2.png",
+    ("espn", "uefa.europa"): "https://a.espncdn.com/i/leaguelogos/soccer/500/2310.png",
+    ("espn", "uefa.europa.conf"): "https://a.espncdn.com/i/leaguelogos/soccer/500/20296.png",
+    ("espn", "ger.2"): "https://a.espncdn.com/i/leaguelogos/soccer/500/97.png",
+    ("espn", "aut.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/5.png",
+    ("espn", "tur.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/18.png",
+    ("espn", "nor.1"): "https://a.espncdn.com/combiner/i?img=/i/teamlogos/soccer/500/default-team-logo-500.png&w=100&h=100",
+    ("espn", "ned.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/11.png",
+    ("espn", "swe.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/16.png",
+    ("espn", "bra.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/85.png",
+    ("espn", "arg.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/1.png",
+    ("espn", "jpn.1"): "https://a.espncdn.com/i/leaguelogos/soccer/500/2199.png",
+    # ESPN basketball
+    ("espn", "usa.nba"): "https://a.espncdn.com/i/teamlogos/leagues/500/nba.png",
+    # ESPN hockey
+    ("espn", "usa.nhl"): "https://a.espncdn.com/i/teamlogos/leagues/500/nhl.png",
+    # Odds API (Google favicons as fallback)
+    ("oddsapi", "soccer_finland_veikkausliiga"): "https://www.google.com/s2/favicons?sz=128&domain=veikkausliiga.com",
+    ("oddsapi", "icehockey_liiga"): "https://www.google.com/s2/favicons?sz=128&domain=liiga.fi",
+}
+
+def get_league_logo(source, code):
+    """Get logo URL for a league by its source and code."""
+    return LEAGUE_LOGOS.get((source, code), "")
+
+# -------------------------------------------------------------
 # CATEGORY & LEAGUE MAPPINGS
 # -------------------------------------------------------------
 categories_info = [
@@ -232,6 +266,7 @@ def fetch_single_league(sport, league_code, league_name, flag_code, target_date)
         if response.status_code == 200:
             data = response.json()
             events = data.get("events", [])
+            league_logo = get_league_logo("espn", league_code)
             matches = []
             for event in events:
                 utc_dt = datetime.fromisoformat(event["date"].replace("Z", "+00:00"))
@@ -263,6 +298,7 @@ def fetch_single_league(sport, league_code, league_name, flag_code, target_date)
                 matches.append({
                     "Διοργάνωση": league_name,
                     "Flag": flag_code,
+                    "League Logo": league_logo,
                     "Ώρα": athens_dt.strftime("%H:%M"),
                     "Logo Γηπ.": home_logo,
                     "Γηπεδούχος": home_team,
@@ -295,6 +331,7 @@ def fetch_odds_api_league(sport_key, league_name, flag_code, target_date, api_ke
             return []
         events = response.json()
         is_hockey = "icehockey" in sport_key
+        league_logo = get_league_logo("oddsapi", sport_key)
         matches = []
         for event in events:
             utc_str = event.get("commence_time", "")
@@ -311,6 +348,7 @@ def fetch_odds_api_league(sport_key, league_name, flag_code, target_date, api_ke
             matches.append({
                 "Διοργάνωση": league_name,
                 "Flag": flag_code,
+                "League Logo": league_logo,
                 "Ώρα": athens_dt.strftime("%H:%M"),
                 "Logo Γηπ.": "",
                 "Γηπεδούχος": home_team,
@@ -360,6 +398,7 @@ def fetch_single_league_range(sport, league_code, league_name, flag_code, start_
         if response.status_code == 200:
             data = response.json()
             events = data.get("events", [])
+            league_logo = get_league_logo("espn", league_code)
             matches_by_date = {}
             for event in events:
                 utc_dt = datetime.fromisoformat(event["date"].replace("Z", "+00:00"))
@@ -389,6 +428,7 @@ def fetch_single_league_range(sport, league_code, league_name, flag_code, start_
                 match = {
                     "Διοργάνωση": league_name,
                     "Flag": flag_code,
+                    "League Logo": league_logo,
                     "Ώρα": athens_dt.strftime("%H:%M"),
                     "Γηπεδούχος": home_team,
                     "Φιλοξενούμενος": away_team,
@@ -417,6 +457,7 @@ def fetch_odds_api_league_range(sport_key, league_name, flag_code, start_date, e
             return {}
         events = response.json()
         is_hockey = "icehockey" in sport_key
+        league_logo = get_league_logo("oddsapi", sport_key)
         matches_by_date = {}
         for event in events:
             utc_str = event.get("commence_time", "")
@@ -433,6 +474,7 @@ def fetch_odds_api_league_range(sport_key, league_name, flag_code, start_date, e
             match = {
                 "Διοργάνωση": league_name,
                 "Flag": flag_code,
+                "League Logo": league_logo,
                 "Ώρα": athens_dt.strftime("%H:%M"),
                 "Γηπεδούχος": home_team,
                 "Φιλοξενούμενος": away_team,

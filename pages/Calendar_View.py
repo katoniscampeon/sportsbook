@@ -10,7 +10,6 @@ st.set_page_config(page_title="Calendar View", page_icon="📅", layout="wide")
 st.markdown("""
     <style>
         .block-container {padding-top: 1.5rem; padding-bottom: 0rem;}
-        .cal-row {padding: 0.6rem 0; border-bottom: 1px solid rgba(128,128,128,0.2);}
     </style>
 """, unsafe_allow_html=True)
 
@@ -99,13 +98,13 @@ for i in range(num_days):
     # Get matches for this date
     day_matches = matches_by_date.get(d, [])
 
-    # Get unique championships and their flags
+    # Get unique championships and their logos
     unique_champs = {}
     for m in day_matches:
         league = m["Διοργάνωση"]
-        flag = m["Flag"]
+        logo = m.get("League Logo", "")
         if league not in unique_champs:
-            unique_champs[league] = flag
+            unique_champs[league] = logo
 
     # Get promos for this date
     day_promos = promos_by_date.get(date_str, [])
@@ -124,14 +123,14 @@ for i in range(num_days):
 
     with col2:
         if unique_champs:
-            # Build flags HTML
-            flags_html = ""
-            for league, flag in unique_champs.items():
-                if flag:
-                    flags_html += f"<img src='https://flagcdn.com/24x18/{flag}.png' style='vertical-align: middle; margin-right: 4px;' width='22' title='{league}'>"
+            # Build logos HTML — league logos instead of flags
+            logos_html = ""
+            for league, logo in unique_champs.items():
+                if logo:
+                    logos_html += f"<img src='{logo}' style='vertical-align: middle; margin-right: 6px;' width='28' height='28' title='{league}'>"
                 else:
-                    flags_html += f"🏳️ "
-            st.markdown(flags_html, unsafe_allow_html=True)
+                    logos_html += f"<span style='margin-right: 8px; font-size: 18px;'>🏆</span>"
+            st.markdown(logos_html, unsafe_allow_html=True)
             # League names
             league_names = list(unique_champs.keys())
             st.caption(" · ".join(league_names))
