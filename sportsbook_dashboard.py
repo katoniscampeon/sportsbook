@@ -308,7 +308,7 @@ components.html(f"""
 # 9. DATA FETCH & DISPLAY (custom HTML table)
 # -------------------------------------------------------------
 def build_match_table_html(matches):
-    """Build an HTML table for matches with proper logo rendering."""
+    """Build a full HTML document for matches with proper logo rendering."""
     rows = []
     for m in matches:
         home_logo = m.get("Logo Γηπ.", "")
@@ -320,24 +320,74 @@ def build_match_table_html(matches):
         odd_X = m.get("X", "N/A")
         odd_2 = m.get("2", "N/A")
 
-        home_logo_html = f'<img class="team-logo" src="{home_logo}" onerror="this.style.visibility=\'hidden\'">' if home_logo else '<span class="no-logo"></span>'
-        away_logo_html = f'<img class="team-logo" src="{away_logo}" onerror="this.style.visibility=\'hidden\'">' if away_logo else '<span class="no-logo"></span>'
+        home_logo_html = f"""<img class="team-logo" src="{home_logo}" onerror="this.style.visibility=\'hidden\'">""" if home_logo else ''
+        away_logo_html = f"""<img class="team-logo" src="{away_logo}" onerror="this.style.visibility=\'hidden\'">""" if away_logo else ''
 
         row = f"""
         <tr>
             <td class="time-cell">{match_time}</td>
-            <td>{home_logo_html}</td>
+            <td class="logo-cell">{home_logo_html}</td>
             <td class="team-cell">{home_team}</td>
             <td class="odds-cell">{odd_1}</td>
             <td class="odds-cell">{odd_X}</td>
             <td class="odds-cell">{odd_2}</td>
             <td class="team-cell">{away_team}</td>
-            <td>{away_logo_html}</td>
+            <td class="logo-cell">{away_logo_html}</td>
         </tr>
         """
         rows.append(row)
 
-    table = f"""
+    table_html = f"""
+    <html>
+    <head><style>
+        body {{ margin: 0; padding: 0; font-family: -apple-system, sans-serif; }}
+        .match-table {{
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }}
+        .match-table th {{
+            text-align: left;
+            padding: 4px 8px;
+            color: rgba(128,128,128,0.6);
+            font-weight: 600;
+            font-size: 0.75rem;
+            border-bottom: 1px solid rgba(128,128,128,0.2);
+        }}
+        .match-table td {{
+            padding: 5px 8px;
+            border-bottom: 1px solid rgba(128,128,128,0.08);
+            vertical-align: middle;
+        }}
+        .match-table tr:hover td {{
+            background-color: rgba(128,128,128,0.05);
+        }}
+        .match-table img.team-logo {{
+            width: 36px;
+            height: 36px;
+            object-fit: contain;
+            vertical-align: middle;
+            display: block;
+        }}
+        .match-table .logo-cell {{
+            width: 44px;
+            text-align: center;
+        }}
+        .match-table .odds-cell {{
+            text-align: center;
+            font-weight: 600;
+            min-width: 42px;
+        }}
+        .match-table .time-cell {{
+            font-weight: 600;
+            white-space: nowrap;
+            color: rgba(128,128,128,0.8);
+        }}
+        .match-table .team-cell {{
+            font-weight: 500;
+        }}
+    </style></head>
+    <body>
     <table class="match-table">
         <thead>
             <tr>
@@ -355,8 +405,10 @@ def build_match_table_html(matches):
             {''.join(rows)}
         </tbody>
     </table>
+    </body>
+    </html>
     """
-    return table
+    return table_html
 
 
 with st.spinner("Φόρτωση αγώνων..."):
@@ -388,9 +440,11 @@ if all_matches:
         else:
             st.markdown(f"#### {league_name}")
 
-        # Custom HTML table instead of st.dataframe
+        # Render as components.html — st.markdown can't render tables
+        num_rows = len(group)
+        table_height = 35 + num_rows * 46
         table_html = build_match_table_html(group.to_dict('records'))
-        st.markdown(table_html, unsafe_allow_html=True)
+        components.html(table_html, height=table_height)
         st.divider()
 else:
     st.info(f"Δεν υπάρχουν προγραμματισμένοι αγώνες για την κατηγορία '{selected_cat}' στις {selected_date.strftime('%d/%m/%Y')}.")
