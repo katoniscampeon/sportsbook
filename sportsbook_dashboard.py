@@ -24,24 +24,60 @@ st.markdown("""
         /* Hide ONLY the default Streamlit page navigation links */
         [data-testid="stSidebarNav"] { display: none !important; }
 
-        /* Slightly reduce sidebar spacing — don't collapse it */
+        /* Slightly reduce sidebar spacing */
         [data-testid="stSidebarContent"] {
             padding-top: 1rem !important;
         }
         section[data-testid="stSidebar"] .stButton > button {
             margin-bottom: 2px;
         }
-        /* Team logos in dataframe — render at proper size */
-        [data-testid="stDataFrame"] img {
-            width: 36px !important;
-            height: 36px !important;
-            object-fit: contain !important;
+
+        /* Custom match table */
+        .match-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
         }
-        [data-testid="stDataFrame"] [role="gridcell"]:has(img) {
-            padding: 2px 4px !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
+        .match-table th {
+            text-align: left;
+            padding: 4px 8px;
+            color: rgba(128,128,128,0.6);
+            font-weight: 600;
+            font-size: 0.75rem;
+            border-bottom: 1px solid rgba(128,128,128,0.2);
+        }
+        .match-table td {
+            padding: 5px 8px;
+            border-bottom: 1px solid rgba(128,128,128,0.08);
+            vertical-align: middle;
+        }
+        .match-table tr:hover td {
+            background-color: rgba(128,128,128,0.05);
+        }
+        .match-table img.team-logo {
+            width: 36px;
+            height: 36px;
+            object-fit: contain;
+            vertical-align: middle;
+        }
+        .match-table img.no-logo {
+            width: 36px;
+            height: 36px;
+            display: inline-block;
+            opacity: 0;
+        }
+        .match-table .odds-cell {
+            text-align: center;
+            font-weight: 600;
+            min-width: 42px;
+        }
+        .match-table .time-cell {
+            font-weight: 600;
+            white-space: nowrap;
+            color: rgba(128,128,128,0.8);
+        }
+        .match-table .team-cell {
+            font-weight: 500;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -149,13 +185,12 @@ def view_promos_dialog():
             st.divider()
 
 # -------------------------------------------------------------
-# 5. SIDEBAR — Navigation at very top, then controls
+# 5. SIDEBAR
 # -------------------------------------------------------------
-# View toggle — replaces default Streamlit page navigation
 view_col1, view_col2 = st.sidebar.columns(2)
 with view_col1:
     if st.button("⚽ Dashboard", key="nav_dash", use_container_width=True, type="primary"):
-        pass  # already on dashboard
+        pass
 with view_col2:
     if st.button("📅 Calendar", key="nav_cal", use_container_width=True, type="secondary"):
         st.switch_page("pages/Calendar_View.py")
@@ -166,7 +201,6 @@ if st.sidebar.button("🔄 Ανανέωση Δεδομένων", use_container_w
     st.cache_data.clear()
     st.rerun()
 
-# Date navigation
 if st.sidebar.button("📅 Σήμερα", on_click=go_today, use_container_width=True):
     pass
 
@@ -271,8 +305,60 @@ components.html(f"""
 """, height=0)
 
 # -------------------------------------------------------------
-# 9. DATA FETCH & DISPLAY
+# 9. DATA FETCH & DISPLAY (custom HTML table)
 # -------------------------------------------------------------
+def build_match_table_html(matches):
+    """Build an HTML table for matches with proper logo rendering."""
+    rows = []
+    for m in matches:
+        home_logo = m.get("Logo Γηπ.", "")
+        away_logo = m.get("Logo Φιλ.", "")
+        home_team = m.get("Γηπεδούχος", "")
+        away_team = m.get("Φιλοξενούμενος", "")
+        match_time = m.get("Ώρα", "")
+        odd_1 = m.get("1", "N/A")
+        odd_X = m.get("X", "N/A")
+        odd_2 = m.get("2", "N/A")
+
+        home_logo_html = f'<img class="team-logo" src="{home_logo}" onerror="this.style.visibility=\'hidden\'">' if home_logo else '<span class="no-logo"></span>'
+        away_logo_html = f'<img class="team-logo" src="{away_logo}" onerror="this.style.visibility=\'hidden\'">' if away_logo else '<span class="no-logo"></span>'
+
+        row = f"""
+        <tr>
+            <td class="time-cell">{match_time}</td>
+            <td>{home_logo_html}</td>
+            <td class="team-cell">{home_team}</td>
+            <td class="odds-cell">{odd_1}</td>
+            <td class="odds-cell">{odd_X}</td>
+            <td class="odds-cell">{odd_2}</td>
+            <td class="team-cell">{away_team}</td>
+            <td>{away_logo_html}</td>
+        </tr>
+        """
+        rows.append(row)
+
+    table = f"""
+    <table class="match-table">
+        <thead>
+            <tr>
+                <th>Ώρα</th>
+                <th></th>
+                <th>Γηπεδούχος</th>
+                <th>1</th>
+                <th>X</th>
+                <th>2</th>
+                <th>Φιλοξενούμενος</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {''.join(rows)}
+        </tbody>
+    </table>
+    """
+    return table
+
+
 with st.spinner("Φόρτωση αγώνων..."):
     all_matches, odds_api_error = fetch_all_matches_parallel(leagues_to_fetch, selected_date, odds_api_key)
 
@@ -302,20 +388,9 @@ if all_matches:
         else:
             st.markdown(f"#### {league_name}")
 
-        display_group = group.drop(columns=["Διοργάνωση", "Flag", "League Logo"], errors="ignore")
-
-        st.dataframe(
-            display_group,
-            column_config={
-                "Logo Γηπ.": st.column_config.ImageColumn("", width="70px"),
-                "Logo Φιλ.": st.column_config.ImageColumn("", width="70px"),
-                "1": st.column_config.TextColumn("1", width="small"),
-                "X": st.column_config.TextColumn("X", width="small"),
-                "2": st.column_config.TextColumn("2", width="small")
-            },
-            use_container_width=True,
-            hide_index=True
-        )
+        # Custom HTML table instead of st.dataframe
+        table_html = build_match_table_html(group.to_dict('records'))
+        st.markdown(table_html, unsafe_allow_html=True)
         st.divider()
 else:
     st.info(f"Δεν υπάρχουν προγραμματισμένοι αγώνες για την κατηγορία '{selected_cat}' στις {selected_date.strftime('%d/%m/%Y')}.")
