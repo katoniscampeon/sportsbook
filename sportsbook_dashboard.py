@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 from datetime import datetime, date, timedelta
 from shared import (
@@ -353,24 +352,6 @@ with col_promos:
     if st.button(btn_label, key="top_view_promos", use_container_width=True, type="primary"):
         view_promos_dialog()
 
-components.html(f"""
-<script>
-    setTimeout(function() {{
-        const buttons = parent.document.querySelectorAll('button');
-        for (const btn of buttons) {{
-            if (btn.textContent.includes('Promos') && !btn.textContent.includes('Add')) {{
-                btn.style.backgroundColor = '{btn_color}';
-                btn.style.borderColor = '{btn_color}';
-                btn.style.color = 'white';
-                btn.addEventListener('click', function() {{
-                    this.style.backgroundColor = '{btn_color}';
-                    this.style.borderColor = '{btn_color}';
-                }});
-            }}
-        }}
-    }}, 100);
-</script>
-""", height=0)
 
 # -------------------------------------------------------------
 # 9. DATA FETCH & DISPLAY (custom HTML table)
@@ -508,11 +489,8 @@ if all_matches:
         else:
             st.markdown(f"#### {league_name}")
 
-        # Render as components.html — st.markdown can't render tables
-        num_rows = len(group)
-        table_height = 35 + num_rows * 46
         table_html = build_match_table_html(group.to_dict('records'))
-        components.html(table_html, height=table_height)
+        st.html(table_html)
         st.divider()
 else:
     st.info(f"Δεν υπάρχουν προγραμματισμένοι αγώνες για την κατηγορία '{selected_cat}' στις {selected_date.strftime('%d/%m/%Y')}.")
