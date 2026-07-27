@@ -2,7 +2,8 @@
 Shared module for Sportsbook Dashboard and Calendar View.
 Contains all data-fetching functions, constants, and helpers.
 """
-import streamlit as st
+import cachetools
+import threading
 import requests
 from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo
@@ -338,7 +339,10 @@ def _competitor_name_logo(comp: dict):
 # -------------------------------------------------------------
 # SINGLE-DAY FETCHERS
 # -------------------------------------------------------------
-@st.cache_data(ttl=120)
+_single_cache = cachetools.TTLCache(maxsize=512, ttl=120)
+_single_cache_lock = threading.Lock()
+
+@cachetools.cached(cache=_single_cache, lock=_single_cache_lock)
 def fetch_single_league(sport, league_code, league_name, flag_code, target_date):
     date_str_curr = target_date.strftime("%Y%m%d")
     date_str_next = (target_date + timedelta(days=1)).strftime("%Y%m%d")
@@ -399,7 +403,10 @@ def fetch_single_league(sport, league_code, league_name, flag_code, target_date)
         pass
     return []
 
-@st.cache_data(ttl=300)
+_oddsapi_cache = cachetools.TTLCache(maxsize=256, ttl=300)
+_oddsapi_cache_lock = threading.Lock()
+
+@cachetools.cached(cache=_oddsapi_cache, lock=_oddsapi_cache_lock)
 def fetch_odds_api_league(sport_key, league_name, flag_code, target_date, api_key):
     if not api_key:
         return []
@@ -475,7 +482,10 @@ def fetch_all_matches_parallel(leagues, target_date, odds_api_key=""):
 # -------------------------------------------------------------
 # DATE-RANGE FETCHERS (for Calendar View)
 # -------------------------------------------------------------
-@st.cache_data(ttl=300)
+_range_cache = cachetools.TTLCache(maxsize=256, ttl=300)
+_range_cache_lock = threading.Lock()
+
+@cachetools.cached(cache=_range_cache, lock=_range_cache_lock)
 def fetch_single_league_range(sport, league_code, league_name, flag_code, start_date, end_date):
     """Fetch matches for a date range, returning dict of date -> list of matches."""
     date_str_start = start_date.strftime("%Y%m%d")
@@ -537,7 +547,10 @@ def fetch_single_league_range(sport, league_code, league_name, flag_code, start_
         pass
     return {}
 
-@st.cache_data(ttl=300)
+_oddsapi_range_cache = cachetools.TTLCache(maxsize=128, ttl=300)
+_oddsapi_range_cache_lock = threading.Lock()
+
+@cachetools.cached(cache=_oddsapi_range_cache, lock=_oddsapi_range_cache_lock)
 def fetch_odds_api_league_range(sport_key, league_name, flag_code, start_date, end_date, api_key):
     """Fetch matches for a date range from The Odds API."""
     if not api_key:

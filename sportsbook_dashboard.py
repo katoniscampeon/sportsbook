@@ -265,7 +265,18 @@ with view_col2:
 st.sidebar.divider()
 
 if st.sidebar.button("🔄 Ανανέωση Δεδομένων", use_container_width=True):
-    st.cache_data.clear()
+    from shared import (
+        _single_cache, _oddsapi_cache, _range_cache, _oddsapi_range_cache,
+        _single_cache_lock, _oddsapi_cache_lock, _range_cache_lock, _oddsapi_range_cache_lock
+    )
+    for cache, lock in [
+        (_single_cache, _single_cache_lock),
+        (_oddsapi_cache, _oddsapi_cache_lock),
+        (_range_cache, _range_cache_lock),
+        (_oddsapi_range_cache, _oddsapi_range_cache_lock),
+    ]:
+        with lock:
+            cache.clear()
     st.rerun()
 
 if st.sidebar.button("📅 Σήμερα", on_click=go_today, use_container_width=True):
