@@ -31,6 +31,17 @@ st.markdown("""
         section[data-testid="stSidebar"] .stButton > button {
             margin-bottom: 2px;
         }
+        /* Force dataframe team logos to render larger */
+        [data-testid="stDataFrame"] img {
+            width: 40px !important;
+            height: 40px !important;
+            object-fit: contain;
+        }
+        [data-testid="stDataFrame"] [data-testid="stDataFrameResizable"] [role="gridcell"] [class*="center"] {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -278,7 +289,7 @@ if all_matches:
 
         if league_logo:
             st.markdown(
-                f"#### <img src='{league_logo}' style='vertical-align: middle; margin-right: 8px;' width='28' height='28' onerror=\"this.style.display='none'\"> {league_name}",
+                f"#### <img src='{league_logo}' style='vertical-align: middle; margin-right: 8px;' width='48' height='48' onerror=\"this.style.display='none'\"> {league_name}",
                 unsafe_allow_html=True
             )
         elif flag_code:
@@ -295,8 +306,8 @@ if all_matches:
         st.dataframe(
             display_group,
             column_config={
-                "Logo Γηπ.": st.column_config.ImageColumn("", width="small"),
-                "Logo Φιλ.": st.column_config.ImageColumn("", width="small"),
+                "Logo Γηπ.": st.column_config.ImageColumn("", width="medium"),
+                "Logo Φιλ.": st.column_config.ImageColumn("", width="medium"),
                 "1": st.column_config.TextColumn("1", width="small"),
                 "X": st.column_config.TextColumn("X", width="small"),
                 "2": st.column_config.TextColumn("2", width="small")
