@@ -31,11 +31,17 @@ st.markdown("""
         section[data-testid="stSidebar"] .stButton > button {
             margin-bottom: 2px;
         }
-        /* Team logos in dataframe — crisp without breaking alignment */
+        /* Team logos in dataframe — render at proper size */
         [data-testid="stDataFrame"] img {
-            min-width: 32px;
-            min-height: 32px;
-            object-fit: contain;
+            width: 36px !important;
+            height: 36px !important;
+            object-fit: contain !important;
+        }
+        [data-testid="stDataFrame"] [role="gridcell"]:has(img) {
+            padding: 2px 4px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -301,8 +307,8 @@ if all_matches:
         st.dataframe(
             display_group,
             column_config={
-                "Logo Γηπ.": st.column_config.ImageColumn("", width="small"),
-                "Logo Φιλ.": st.column_config.ImageColumn("", width="small"),
+                "Logo Γηπ.": st.column_config.ImageColumn("", width="70px"),
+                "Logo Φιλ.": st.column_config.ImageColumn("", width="70px"),
                 "1": st.column_config.TextColumn("1", width="small"),
                 "X": st.column_config.TextColumn("X", width="small"),
                 "2": st.column_config.TextColumn("2", width="small")
