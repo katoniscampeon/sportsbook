@@ -1,16 +1,18 @@
 import streamlit as st
-import pandas as pd
-from datetime import datetime, date, timedelta
-from zoneinfo import ZoneInfo
+import sys
+import traceback
 
-# Simple timezone setup
-athens_tz = ZoneInfo("Europe/Athens")
-now_athens = datetime.now(athens_tz)
-effective_today = (now_athens - timedelta(hours=7)).date()
+# Add error logging to stderr so you can see it in terminal
+def log_error(msg):
+    print(f"[STREAMLIT ERROR] {msg}", file=sys.stderr)
+    traceback.print_exc(file=sys.stderr)
 
-# Page config
-st.set_page_config(page_title="Sportsbook Dashboard", page_icon="⚽", layout="wide")
-
-st.title("⚽ Sportsbook Dashboard")
-st.write("✅ App is working!")
-st.write(f"Today: {effective_today}")
+try:
+    st.set_page_config(page_title="Sportsbook Dashboard", page_icon="⚽", layout="wide")
+    st.title("⚽ Sportsbook Dashboard")
+    st.write("✅ Basic app works!")
+    
+except Exception as e:
+    log_error(f"Error in page config: {str(e)}")
+    st.error(f"Error: {str(e)}")
+    traceback.print_exc()
