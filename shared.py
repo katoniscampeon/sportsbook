@@ -44,6 +44,8 @@ LEAGUE_LOGOS = {
     ("espn", "usa.nba"): "https://a.espncdn.com/i/teamlogos/leagues/500/nba.png",
     # ESPN hockey
     ("espn", "usa.nhl"): "https://a.espncdn.com/i/teamlogos/leagues/500/nhl.png",
+    # ESPN tennis
+    ("espn", "atp"): "https://a.espncdn.com/i/leaguelogos/tennis/500/2.png",
     # Odds API (high-res uploaded logos)
     ("oddsapi", "soccer_finland_veikkausliiga"): "https://base44.app/api/apps/6a6377d69bbbbbc36ad8c7da/files/mp/public/6a6377d69bbbbbc36ad8c7da/e11214525_veikkausliiga_logo.png",
     ("oddsapi", "icehockey_liiga"): "https://base44.app/api/apps/6a6377d69bbbbbc36ad8c7da/files/mp/public/6a6377d69bbbbbc36ad8c7da/b5c79c5c1_liiga_logo.png",
@@ -53,12 +55,48 @@ def get_league_logo(source, code):
     """Get logo URL for a league by its source and code."""
     return LEAGUE_LOGOS.get((source, code), "")
 
+# Sport type mapping for display (used for calendar sport separation)
+SPORT_ICON = {
+    "soccer": "⚽",
+    "basketball": "🏀",
+    "tennis": "🎾",
+    "hockey": "🏒",
+    "other": "🏆",
+}
+
+def sport_from_espn(sport_param: str) -> str:
+    """Normalise ESPN sport parameter to a canonical sport key."""
+    s = sport_param.lower()
+    if s in ("soccer", "football"):
+        return "soccer"
+    if s in ("basketball",):
+        return "basketball"
+    if s in ("hockey", "icehockey"):
+        return "hockey"
+    if s in ("tennis",):
+        return "tennis"
+    return "other"
+
+def sport_from_odds_key(sport_key: str) -> str:
+    """Derive canonical sport from an Odds API sport_key string."""
+    k = sport_key.lower()
+    if "icehockey" in k or "hockey" in k:
+        return "hockey"
+    if "basketball" in k:
+        return "basketball"
+    if "tennis" in k:
+        return "tennis"
+    if "soccer" in k or "football" in k:
+        return "soccer"
+    return "other"
+
 # -------------------------------------------------------------
 # CATEGORY & LEAGUE MAPPINGS
 # -------------------------------------------------------------
 categories_info = [
     {"id": "⭐ Top Leagues", "label": "Top Leagues", "flag": None},
     {"id": "🌐 All", "label": "All", "flag": None},
+    {"id": "🎾 Tennis", "label": "Tennis", "flag": None},
     {"id": "France", "label": "France", "flag": "fr"},
     {"id": "Germany", "label": "Germany", "flag": "de"},
     {"id": "Norway", "label": "Norway", "flag": "no"},
@@ -79,6 +117,9 @@ category_mapping = {
         ("espn", "soccer", "uefa.europa", "UEFA Europa League", "eu"),
         ("espn", "soccer", "uefa.europa.conf", "UEFA Conference League", "eu"),
         ("espn", "basketball", "usa.nba", "NBA", "us")
+    ],
+    "🎾 Tennis": [
+        ("espn", "tennis", "atp", "ATP Tour", "un"),
     ],
     "France": [
         ("espn", "soccer", "fra.1", "France - Ligue 1", "fr"),
@@ -265,6 +306,23 @@ def extract_odds_api_h2h(event, is_hockey=False):
     return odd_1, odd_X, odd_2
 
 # -------------------------------------------------------------
+# HELPERS: competitor name/logo (handles team sports & tennis)
+# -------------------------------------------------------------
+def _competitor_name_logo(comp: dict):
+    """Extract display name and logo URL from an ESPN competitor dict."""
+    # Team sports
+    team = comp.get("team", {}) or {}
+    name = team.get("displayName", "") or team.get("shortDisplayName", "")
+    logo = team.get("logo", "")
+    # Tennis / individual athlete fallback
+    if not name:
+        athlete = comp.get("athlete", {}) or {}
+        name = athlete.get("displayName", "") or athlete.get("shortName", "")
+        hs = athlete.get("headshot", {}) or {}
+        logo = logo or hs.get("href", "")
+    return name or "?", logo
+
+# -------------------------------------------------------------
 # SINGLE-DAY FETCHERS
 # -------------------------------------------------------------
 @st.cache_data(ttl=120)
@@ -272,6 +330,8 @@ def fetch_single_league(sport, league_code, league_name, flag_code, target_date)
     date_str_curr = target_date.strftime("%Y%m%d")
     date_str_next = (target_date + timedelta(days=1)).strftime("%Y%m%d")
     url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league_code}/scoreboard?dates={date_str_curr}-{date_str_next}"
+    sport_key = sport_from_espn(sport)
+    no_draw = sport_key in ("basketball", "hockey", "tennis")
     try:
         response = session.get(url, timeout=5)
         if response.status_code == 200:
@@ -292,24 +352,26 @@ def fetch_single_league(sport, league_code, league_name, flag_code, target_date)
                 competitors = competition.get("competitors", [])
                 home_comp_list = [c for c in competitors if c.get("homeAway") == "home"]
                 away_comp_list = [c for c in competitors if c.get("homeAway") == "away"]
+                # Fallback for sports without homeAway (e.g. tennis)
+                if not home_comp_list and len(competitors) >= 1:
+                    home_comp_list = [competitors[0]]
+                if not away_comp_list and len(competitors) >= 2:
+                    away_comp_list = [competitors[1]]
                 if not home_comp_list or not away_comp_list:
                     continue
                 home_comp = home_comp_list[0]
                 away_comp = away_comp_list[0]
-                home_team = home_comp.get("team", {}).get("displayName", "Home")
-                home_logo = home_comp.get("team", {}).get("logo", "")
-                away_team = away_comp.get("team", {}).get("displayName", "Away")
-                away_logo = away_comp.get("team", {}).get("logo", "")
+                home_team, home_logo = _competitor_name_logo(home_comp)
+                away_team, away_logo = _competitor_name_logo(away_comp)
                 odds_data = competition.get("odds", [])
                 odd_1, odd_X, odd_2 = extract_all_match_odds(odds_data)
-                no_draw_sports = ["basketball", "hockey"]
-                no_draw_leagues = ["usa.nba", "usa.nhl"]
-                if sport in no_draw_sports or league_code in no_draw_leagues:
+                if no_draw:
                     odd_X = "-"
                 matches.append({
                     "Διοργάνωση": league_name,
                     "Flag": flag_code,
                     "League Logo": league_logo,
+                    "Sport": sport_key,
                     "Ώρα": athens_dt.strftime("%H:%M"),
                     "Logo Γηπ.": home_logo,
                     "Γηπεδούχος": home_team,
@@ -330,6 +392,7 @@ def fetch_odds_api_league(sport_key, league_name, flag_code, target_date, api_ke
         return []
     url = f"{ODDS_API_BASE}/sports/{sport_key}/odds/"
     params = {"apiKey": api_key, "regions": "eu", "oddsFormat": "decimal", "dateFormat": "iso"}
+    sport_canon = sport_from_odds_key(sport_key)
     try:
         response = session.get(url, params=params, timeout=10)
         if response.status_code == 422:
@@ -341,7 +404,7 @@ def fetch_odds_api_league(sport_key, league_name, flag_code, target_date, api_ke
         if response.status_code != 200:
             return []
         events = response.json()
-        is_hockey = "icehockey" in sport_key
+        is_hockey = sport_canon == "hockey"
         league_logo = get_league_logo("oddsapi", sport_key)
         matches = []
         for event in events:
@@ -360,6 +423,7 @@ def fetch_odds_api_league(sport_key, league_name, flag_code, target_date, api_ke
                 "Διοργάνωση": league_name,
                 "Flag": flag_code,
                 "League Logo": league_logo,
+                "Sport": sport_canon,
                 "Ώρα": athens_dt.strftime("%H:%M"),
                 "Logo Γηπ.": "",
                 "Γηπεδούχος": home_team,
@@ -404,6 +468,8 @@ def fetch_single_league_range(sport, league_code, league_name, flag_code, start_
     date_str_start = start_date.strftime("%Y%m%d")
     date_str_end = (end_date + timedelta(days=1)).strftime("%Y%m%d")
     url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league_code}/scoreboard?dates={date_str_start}-{date_str_end}"
+    sport_key = sport_from_espn(sport)
+    no_draw = sport_key in ("basketball", "hockey", "tennis")
     try:
         response = session.get(url, timeout=10)
         if response.status_code == 200:
@@ -424,22 +490,25 @@ def fetch_single_league_range(sport, league_code, league_name, flag_code, start_
                 competitors = competition.get("competitors", [])
                 home_comp_list = [c for c in competitors if c.get("homeAway") == "home"]
                 away_comp_list = [c for c in competitors if c.get("homeAway") == "away"]
+                if not home_comp_list and len(competitors) >= 1:
+                    home_comp_list = [competitors[0]]
+                if not away_comp_list and len(competitors) >= 2:
+                    away_comp_list = [competitors[1]]
                 if not home_comp_list or not away_comp_list:
                     continue
                 home_comp = home_comp_list[0]
                 away_comp = away_comp_list[0]
-                home_team = home_comp.get("team", {}).get("displayName", "Home")
-                away_team = away_comp.get("team", {}).get("displayName", "Away")
+                home_team, _ = _competitor_name_logo(home_comp)
+                away_team, _ = _competitor_name_logo(away_comp)
                 odds_data = competition.get("odds", [])
                 odd_1, odd_X, odd_2 = extract_all_match_odds(odds_data)
-                no_draw_sports = ["basketball", "hockey"]
-                no_draw_leagues = ["usa.nba", "usa.nhl"]
-                if sport in no_draw_sports or league_code in no_draw_leagues:
+                if no_draw:
                     odd_X = "-"
                 match = {
                     "Διοργάνωση": league_name,
                     "Flag": flag_code,
                     "League Logo": league_logo,
+                    "Sport": sport_key,
                     "Ώρα": athens_dt.strftime("%H:%M"),
                     "Γηπεδούχος": home_team,
                     "Φιλοξενούμενος": away_team,
@@ -462,12 +531,13 @@ def fetch_odds_api_league_range(sport_key, league_name, flag_code, start_date, e
         return {}
     url = f"{ODDS_API_BASE}/sports/{sport_key}/odds/"
     params = {"apiKey": api_key, "regions": "eu", "oddsFormat": "decimal", "dateFormat": "iso"}
+    sport_canon = sport_from_odds_key(sport_key)
     try:
         response = session.get(url, params=params, timeout=10)
         if response.status_code != 200:
             return {}
         events = response.json()
-        is_hockey = "icehockey" in sport_key
+        is_hockey = sport_canon == "hockey"
         league_logo = get_league_logo("oddsapi", sport_key)
         matches_by_date = {}
         for event in events:
@@ -486,6 +556,7 @@ def fetch_odds_api_league_range(sport_key, league_name, flag_code, start_date, e
                 "Διοργάνωση": league_name,
                 "Flag": flag_code,
                 "League Logo": league_logo,
+                "Sport": sport_canon,
                 "Ώρα": athens_dt.strftime("%H:%M"),
                 "Γηπεδούχος": home_team,
                 "Φιλοξενούμενος": away_team,

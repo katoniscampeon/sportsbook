@@ -10,6 +10,7 @@ from shared import (
     extract_odds_api_h2h,
     fetch_single_league, fetch_odds_api_league, fetch_all_matches_parallel
 )
+from promo_store import load_promos, save_promos, add_promo, delete_promo, dates_in_range
 
 # -------------------------------------------------------------
 # 1. PAGE CONFIGURATION & STYLING
@@ -103,8 +104,8 @@ if "selected_date" not in st.session_state:
 if "selected_category" not in st.session_state:
     st.session_state.selected_category = "🌐 All"
 
-if "promos" not in st.session_state:
-    st.session_state.promos = []
+# Sync persistent promos into session_state on every load
+st.session_state.promos = load_promos()
 
 def prev_day():
     st.session_state.selected_date -= timedelta(days=1)
@@ -116,71 +117,138 @@ def go_today():
     st.session_state.selected_date = effective_today
 
 # -------------------------------------------------------------
-# 4. PROMO DIALOGS
+# 4. SHARED PROMO DIALOG HELPERS
 # -------------------------------------------------------------
-@st.dialog("➕ Δημιουργία Promo")
-def add_promo_dialog():
-    boost_type = st.radio("Τύπος Boost", ["Golden Boost", "Betslip Boost"])
-    selection_type = st.radio("Επιλογή", ["🏟️ Συγκεκριμένος Αγώνας", "🏆 Πρωτάθλημα της Ημέρας"])
+BOOST_TYPES = ["Golden Boost", "Betslip Boost", "Other"]
 
-    promo_date = st.session_state.selected_date
-    all_leagues = get_all_leagues_unique()
-    odds_api_key = get_odds_api_key()
-    all_day_matches, _ = fetch_all_matches_parallel(all_leagues, promo_date, odds_api_key)
+
+def _render_promo_form(default_date: date):
+    """Render the promo form fields. Returns a promo dict or None."""
+
+    # --- Boost type ---
+    boost_type_choice = st.radio("Τύπος Boost", BOOST_TYPES, horizontal=True)
+    if boost_type_choice == "Other":
+        custom_type = st.text_input("Προσαρμοσμένος τύπος", placeholder="π.χ. Super Odds")
+        boost_label = custom_type.strip() if custom_type.strip() else "Other"
+    else:
+        boost_label = boost_type_choice
+
+    st.divider()
+
+    # --- Date selection ---
+    date_mode = st.radio("Επιλογή ημερομηνίας", ["Μία ημέρα", "Εύρος ημερομηνιών"], horizontal=True)
+    if date_mode == "Μία ημέρα":
+        chosen_date = st.date_input("Ημερομηνία", value=default_date)
+        promo_dates = [chosen_date.strftime("%d/%m/%Y")]
+    else:
+        col_s, col_e = st.columns(2)
+        with col_s:
+            range_start = st.date_input("Από", value=default_date)
+        with col_e:
+            range_end = st.date_input("Έως", value=default_date + timedelta(days=6))
+        if range_end < range_start:
+            st.warning("Η ημερομηνία 'Έως' πρέπει να είναι μετά την 'Από'.")
+            promo_dates = [range_start.strftime("%d/%m/%Y")]
+        else:
+            promo_dates = dates_in_range(range_start, range_end)
+
+    st.divider()
+
+    # --- Selection type ---
+    selection_type = st.radio(
+        "Επιλογή",
+        ["🏟️ Συγκεκριμένος Αγώνας", "🏆 Πρωτάθλημα", "📝 Άλλο"],
+        horizontal=True
+    )
+
+    selected_match = None
+    selected_championship = None
+    other_label = None
 
     if selection_type == "🏟️ Συγκεκριμένος Αγώνας":
+        ref_date = date.fromisoformat(promo_dates[0].split("/")[-1] + "-" +
+                                       promo_dates[0].split("/")[1] + "-" +
+                                       promo_dates[0].split("/")[0])
+        all_leagues = get_all_leagues_unique()
+        odds_api_key = get_odds_api_key()
+        all_day_matches, _ = fetch_all_matches_parallel(all_leagues, ref_date, odds_api_key)
         match_options = [
             f"{m['Γηπεδούχος']} vs {m['Φιλοξενούμενος']} ({m['Ώρα']}) — {m['Διοργάνωση']}"
             for m in all_day_matches
         ]
         if match_options:
-            selected_match = st.selectbox(f"Αγώνας ({promo_date.strftime('%d/%m/%Y')})", match_options)
+            selected_match = st.selectbox(f"Αγώνας ({ref_date.strftime('%d/%m/%Y')})", match_options)
         else:
-            selected_match = None
-            st.warning(f"Δεν βρέθηκαν αγώνες για {promo_date.strftime('%d/%m/%Y')}.")
-        selected_championship = None
-    else:
+            st.warning(f"Δεν βρέθηκαν αγώνες για {ref_date.strftime('%d/%m/%Y')}.")
+
+    elif selection_type == "🏆 Πρωτάθλημα":
+        ref_date = date.fromisoformat(promo_dates[0].split("/")[-1] + "-" +
+                                       promo_dates[0].split("/")[1] + "-" +
+                                       promo_dates[0].split("/")[0])
+        all_leagues = get_all_leagues_unique()
+        odds_api_key = get_odds_api_key()
+        all_day_matches, _ = fetch_all_matches_parallel(all_leagues, ref_date, odds_api_key)
         championship_options = sorted(set(m["Διοργάνωση"] for m in all_day_matches))
         if championship_options:
-            selected_championship = st.selectbox(f"Πρωτάθλημα ({promo_date.strftime('%d/%m/%Y')})", championship_options)
+            selected_championship = st.selectbox(f"Πρωτάθλημα ({ref_date.strftime('%d/%m/%Y')})", championship_options)
         else:
-            selected_championship = None
-            st.warning(f"Δεν βρέθηκαν πρωταθλήματα για {promo_date.strftime('%d/%m/%Y')}.")
-        selected_match = None
+            st.warning(f"Δεν βρέθηκαν πρωταθλήματα για {ref_date.strftime('%d/%m/%Y')}.")
 
-    specification = st.text_area("Specification", placeholder="Γράψε τις λεπτομέρειες / σημειώσεις του promo...")
+    else:  # Άλλο
+        other_label = st.text_input("Περιγραφή", placeholder="π.χ. Super Sunday Special")
+
+    specification = st.text_area("Σημειώσεις / Specification", placeholder="Γράψε τις λεπτομέρειες του promo...")
+
+    return {
+        "type": boost_label,
+        "match": selected_match,
+        "championship": selected_championship,
+        "other": other_label,
+        "notes": specification,
+        "promo_dates": promo_dates,
+        # keep legacy field pointing at first date for backwards compat
+        "promo_date": promo_dates[0] if promo_dates else "",
+        "created": datetime.now(athens_tz).strftime("%d/%m/%Y %H:%M")
+    }
+
+
+# -------------------------------------------------------------
+# 4. PROMO DIALOGS
+# -------------------------------------------------------------
+@st.dialog("➕ Δημιουργία Promo")
+def add_promo_dialog():
+    promo = _render_promo_form(default_date=st.session_state.selected_date)
 
     col_save, col_cancel = st.columns(2)
     with col_save:
         if st.button("💾 Αποθήκευση", use_container_width=True, type="primary"):
-            st.session_state.promos.append({
-                "type": boost_type,
-                "match": selected_match,
-                "championship": selected_championship,
-                "notes": specification,
-                "promo_date": promo_date.strftime("%d/%m/%Y"),
-                "created": datetime.now(athens_tz).strftime("%d/%m/%Y %H:%M")
-            })
+            updated = add_promo(promo)
+            st.session_state.promos = updated
             st.rerun()
     with col_cancel:
         if st.button("❌ Ακύρωση", use_container_width=True):
             st.rerun()
 
+
 @st.dialog("👁 Promos")
 def view_promos_dialog():
-    if not st.session_state.promos:
+    promos = load_promos()
+    if not promos:
         st.info("Δεν υπάρχουν αποθηκευμένα promos.")
     else:
-        for idx, promo in enumerate(st.session_state.promos):
-            st.markdown(f"**{promo['type']}** &nbsp;·&nbsp; _{promo['created']}_")
+        for idx, promo in enumerate(promos):
+            st.markdown(f"**{promo['type']}** &nbsp;·&nbsp; _{promo.get('created', '')}_ &nbsp;·&nbsp; 📅 {', '.join(promo.get('promo_dates', [promo.get('promo_date', '')]))}")
             if promo.get("match"):
                 st.markdown(f"🏟️ {promo['match']}")
             if promo.get("championship"):
                 st.markdown(f"🏆 {promo['championship']}")
+            if promo.get("other"):
+                st.markdown(f"📝 {promo['other']}")
             if promo.get("notes"):
                 st.markdown(f"📝 {promo['notes']}")
             if st.button("🗑️ Διαγραφή", key=f"del_promo_{idx}", use_container_width=True):
-                st.session_state.promos.pop(idx)
+                updated = delete_promo(idx)
+                st.session_state.promos = updated
                 st.rerun()
             st.divider()
 
