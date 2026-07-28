@@ -1,3 +1,4 @@
+modules = ["python-base-3.13"]
 [env]
 PYTHONUNBUFFERED = "1"
 
@@ -10,11 +11,36 @@ runButton = "Project"
 
 [[workflows.workflow]]
 name = "Project"
-author = "user"
+author = "agent"
+mode = "parallel"
+
+[workflows.workflow.metadata]
+outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "pip install -r requirements.txt && streamlit run sportsbook_dashboard.py"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
 [workflows.workflow.metadata]
 outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = ".pythonlibs/bin/python3.12 -m streamlit run sportsbook_dashboard.py --server.port 5000 --server.address 0.0.0.0"
+waitForPort = 5000
+
+[nix]
+channel = "stable-25_05"
+packages = ["freetype", "glibcLocales", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "openjpeg", "tcl", "tk", "zlib"]
+
+[[ports]]
+localPort = 5000
+externalPort = 80

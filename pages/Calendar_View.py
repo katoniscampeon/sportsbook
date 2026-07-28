@@ -300,6 +300,13 @@ for promo in st.session_state.promos:
 # SPORT ORDER for calendar display
 # -------------------------------------------------------------
 SPORT_ORDER = ["soccer", "basketball", "tennis", "hockey", "other"]
+SPORT_ICON = {
+    "soccer": "⚽",
+    "basketball": "🏀",
+    "tennis": "🎾",
+    "hockey": "🏒",
+    "other": "🏆",
+}
 
 
 def build_sport_logos_html(day_matches: list) -> str:
