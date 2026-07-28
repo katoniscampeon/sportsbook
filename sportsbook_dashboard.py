@@ -7,7 +7,7 @@ from shared import (
     get_all_leagues_unique,
     parse_odd_value, search_team_odd_in_dict, extract_all_match_odds,
     extract_odds_api_h2h,
-    fetch_single_league, fetch_odds_api_league, fetch_all_matches_parallel
+    fetch_single_league, fetch_odds_api_league, fetch_all_matches_parallel,
 )
 from promo_store import load_promos, save_promos, add_promo, delete_promo, dates_in_range
 

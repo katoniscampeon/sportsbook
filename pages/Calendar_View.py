@@ -3,7 +3,7 @@ from datetime import date, timedelta, datetime
 from shared import (
     athens_tz, now_athens, effective_today,
     get_all_leagues_unique, fetch_all_matches_for_range,
-    SPORT_ICON
+    category_mapping,
 )
 from promo_store import load_promos, add_promo, delete_promo, dates_in_range
 
@@ -278,8 +278,12 @@ st.markdown(f"**{start_date.strftime('%d/%m/%Y')} — {end_date.strftime('%d/%m/
 odds_api_key = get_odds_api_key()
 all_leagues = get_all_leagues_unique()
 
+# Include Tennis (ATP) in calendar — fetched separately since excluded from All
+tennis_leagues = category_mapping.get("🎾 Tennis", [])
+all_cal_leagues = all_leagues + [l for l in tennis_leagues if l not in all_leagues]
+
 with st.spinner("Φόρτωση όλων των αγώνων..."):
-    matches_by_date = fetch_all_matches_for_range(all_leagues, start_date, end_date, odds_api_key)
+    matches_by_date = fetch_all_matches_for_range(all_cal_leagues, start_date, end_date, odds_api_key)
 
 # -------------------------------------------------------------
 # BUILD PROMO LOOKUP BY DATE
