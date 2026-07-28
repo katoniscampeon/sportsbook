@@ -9,6 +9,16 @@ from promo_store import load_promos, add_promo, delete_promo, dates_in_range
 
 st.set_page_config(page_title="Calendar View", page_icon="📅", layout="wide")
 
+# ---- Handle date navigation from calendar click ----
+_nav_date = st.query_params.get("nav_date")
+if _nav_date:
+    try:
+        st.session_state.selected_date = date.fromisoformat(_nav_date)
+    except Exception:
+        pass
+    st.query_params.clear()
+    st.switch_page("sportsbook_dashboard.py")
+
 st.markdown("""
     <style>
         .block-container {padding-top: 1rem; padding-bottom: 0rem;}
@@ -60,6 +70,17 @@ st.markdown("""
             font-size: 0.78rem;
         }
         .cal-empty { color: rgba(128,128,128,0.4); }
+        .cal-date-link {
+            color: inherit;
+            text-decoration: none;
+            font-weight: 600;
+            display: block;
+        }
+        .cal-date-link:hover {
+            color: #e8a800;
+            text-decoration: underline;
+            cursor: pointer;
+        }
         .cal-today-badge {
             font-size: 0.7rem; background: #e8a800; color: #000;
             border-radius: 3px; padding: 0 3px; margin-left: 4px;
@@ -375,7 +396,8 @@ for i in range(num_days):
     is_today = (d == effective_today)
 
     today_badge = '<span class="cal-today-badge">ΣΗΜΕΡΑ</span>' if is_today else ""
-    date_cell = f"{d.day}/{d.month} {day_name}{today_badge}"
+    nav_date_iso = d.strftime("%Y-%m-%d")
+    date_cell = f'<a href="?nav_date={nav_date_iso}" class="cal-date-link">{d.day}/{d.month} {day_name}{today_badge}</a>'
 
     # Sport-separated logos
     logos_html = build_sport_logos_html(day_matches)

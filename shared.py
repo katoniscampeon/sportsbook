@@ -49,6 +49,10 @@ LEAGUE_LOGOS = {
     ("espn", "bra.1"):               "https://a.espncdn.com/i/leaguelogos/soccer/500/85.png",
     ("espn", "arg.1"):               "https://a.espncdn.com/i/leaguelogos/soccer/500/1.png",
     ("espn", "jpn.1"):               "https://a.espncdn.com/i/leaguelogos/soccer/500/2199.png",
+    # ESPN soccer — UEFA qualifiers (same logos as the main competitions)
+    ("espn", "uefa.champions_qual"):   "https://a.espncdn.com/i/leaguelogos/soccer/500/2.png",
+    ("espn", "uefa.europa_qual"):      "https://a.espncdn.com/i/leaguelogos/soccer/500/2310.png",
+    ("espn", "uefa.europa.conf_qual"): "https://a.espncdn.com/i/leaguelogos/soccer/500/20296.png",
     # ESPN basketball
     ("espn", "usa.nba"):             "https://a.espncdn.com/i/teamlogos/leagues/500/nba.png",
     # ESPN hockey
@@ -95,6 +99,10 @@ category_mapping = {
         ("espn", "soccer",     "uefa.super_cup",   "UEFA Super Cup",             "eu"),
         ("espn", "soccer",     "eng.league_cup",   "EFL Cup",                    "gb-eng"),
         ("espn", "basketball", "usa.nba",          "NBA",                        "us"),
+        ("espn", "basketball", "usa.nba",          "NBA Preseason",              "us", "seasontype=1"),
+        ("espn", "soccer",     "uefa.champions_qual",   "UCL Qualifying",        "eu"),
+        ("espn", "soccer",     "uefa.europa_qual",      "UEL Qualifying",        "eu"),
+        ("espn", "soccer",     "uefa.europa.conf_qual", "UECL Qualifying",       "eu"),
     ],
     "France": [
         ("espn", "soccer", "fra.1",            "France - Ligue 1",          "fr"),
@@ -302,11 +310,13 @@ NO_DRAW_LEAGUES = {"usa.nba", "usa.nhl", "atp", "wta"}
 # ESPN — single day fetcher
 # -------------------------------------------------------------
 @st.cache_data(ttl=120)
-def fetch_single_league(sport, league_code, league_name, flag_code, target_date):
+def fetch_single_league(sport, league_code, league_name, flag_code, target_date, extra_params=""):
     """Fetch matches for an ESPN league on a specific day. Handles tennis tournaments too."""
     date_str_curr = target_date.strftime("%Y%m%d")
     date_str_next = (target_date + timedelta(days=1)).strftime("%Y%m%d")
     url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league_code}/scoreboard?dates={date_str_curr}-{date_str_next}"
+    if extra_params:
+        url += f"&{extra_params}"
 
     is_tennis   = (sport == "tennis")
     no_draw     = (sport in NO_DRAW_SPORTS or league_code in NO_DRAW_LEAGUES)
@@ -349,6 +359,7 @@ def fetch_single_league(sport, league_code, league_name, flag_code, target_date)
                             "Flag":            flag_code,
                             "League Logo":     tournament_logo,
                             "Ώρα":             athens_dt.strftime("%H:%M"),
+                            "Sport":           sport,
                             "Logo Γηπ.":       "",
                             "Γηπεδούχος":      home_name,
                             "1":               "—",
@@ -389,6 +400,7 @@ def fetch_single_league(sport, league_code, league_name, flag_code, target_date)
                 "Flag":           flag_code,
                 "League Logo":    league_logo,
                 "Ώρα":            athens_dt.strftime("%H:%M"),
+                "Sport":          sport,
                 "Logo Γηπ.":      home_logo,
                 "Γηπεδούχος":     home_team,
                 "1":              odd_1,
@@ -487,8 +499,9 @@ def fetch_all_matches_parallel(leagues, target_date, odds_api_key=""):
         futures = {}
         for league in leagues:
             if league[0] == "espn":
-                _, sport, code, name, flag = league
-                futures[executor.submit(fetch_single_league, sport, code, name, flag, target_date)] = "espn"
+                _, sport, code, name, flag = league[:5]
+                extra = league[5] if len(league) > 5 else ""
+                futures[executor.submit(fetch_single_league, sport, code, name, flag, target_date, extra)] = "espn"
             elif league[0] == "oddsapi":
                 _, sport_key, name, flag = league
                 futures[executor.submit(fetch_odds_api_league, sport_key, name, flag, target_date, odds_api_key)] = "oddsapi"
@@ -505,10 +518,12 @@ def fetch_all_matches_parallel(leagues, target_date, odds_api_key=""):
 # ESPN — date-range fetcher (for Calendar View)
 # -------------------------------------------------------------
 @st.cache_data(ttl=300)
-def fetch_single_league_range(sport, league_code, league_name, flag_code, start_date, end_date):
+def fetch_single_league_range(sport, league_code, league_name, flag_code, start_date, end_date, extra_params=""):
     date_str_start = start_date.strftime("%Y%m%d")
     date_str_end   = (end_date + timedelta(days=1)).strftime("%Y%m%d")
     url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league_code}/scoreboard?dates={date_str_start}-{date_str_end}"
+    if extra_params:
+        url += f"&{extra_params}"
     is_tennis   = (sport == "tennis")
     no_draw     = (sport in NO_DRAW_SPORTS or league_code in NO_DRAW_LEAGUES)
     league_logo = get_league_logo("espn", league_code)
@@ -544,6 +559,7 @@ def fetch_single_league_range(sport, league_code, league_name, flag_code, start_
                             "Flag":           flag_code,
                             "League Logo":    tournament_logo,
                             "Ώρα":            athens_dt.strftime("%H:%M"),
+                            "Sport":          sport,
                             "Γηπεδούχος":     home_name,
                             "Φιλοξενούμενος": away_name,
                             "1": "—", "X": "-", "2": "—",
@@ -577,6 +593,7 @@ def fetch_single_league_range(sport, league_code, league_name, flag_code, start_
                 "Flag":           flag_code,
                 "League Logo":    league_logo,
                 "Ώρα":            athens_dt.strftime("%H:%M"),
+                "Sport":          sport,
                 "Γηπεδούχος":     home_team,
                 "Φιλοξενούμενος": away_team,
                 "1": odd_1, "X": odd_X, "2": odd_2,
@@ -647,8 +664,9 @@ def fetch_all_matches_for_range(all_leagues, start_date, end_date, odds_api_key=
         futures = {}
         for league in all_leagues:
             if league[0] == "espn":
-                _, sport, code, name, flag = league
-                futures[executor.submit(fetch_single_league_range, sport, code, name, flag, start_date, end_date)] = "espn"
+                _, sport, code, name, flag = league[:5]
+                extra = league[5] if len(league) > 5 else ""
+                futures[executor.submit(fetch_single_league_range, sport, code, name, flag, start_date, end_date, extra)] = "espn"
             elif league[0] == "oddsapi":
                 _, sport_key, name, flag = league
                 futures[executor.submit(fetch_odds_api_league_range, sport_key, name, flag, start_date, end_date, odds_api_key)] = "oddsapi"
