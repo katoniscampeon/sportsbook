@@ -220,6 +220,137 @@ def get_all_leagues_unique():
 
     all_leagues.sort(key=_league_sort_key)
     return all_leagues
+# -------------------------------------------------------------
+# ODDS PARSER (ESPN American → Decimal)
+# -------------------------------------------------------------
+def parse_odd_value(raw):
+    if raw is None or raw == "":
+        return None
+    try:
+        if isinstance(raw, str) and (raw.startswith("+") or raw.startswith("-")):
+            val = float(raw)
+            if val > 0:
+                return f"{(val / 100.0) + 1.0:.2f}"
+            elif val < 0:
+                return f"{(100.0 / abs(val)) + 1.0:.2f}"
+        val = float(raw)
+        if val == 0:
+            return None
+        if 1.0 < val < 50.0:
+            return f"{val:.2f}"
+        elif val > 0:
+            return f"{(val / 100.0) + 1.0:.2f}"
+        elif val < 0:
+            return f"{(100.0 / abs(val)) + 1.0:.2f}"
+    except (ValueError, TypeError):
+        pass
+    return None
+
+def search_team_odd_in_dict(d):
+    if d is None:
+        return None
+    if not isinstance(d, dict):
+        return parse_odd_value(d)
+    for key in ["value", "moneyLine", "moneyline", "odds", "american", "decimal", "summary"]:
+        if key in d and d[key] is not None:
+            res = parse_odd_value(d[key])
+            if res:
+                return res
+    return None
+
+def extract_all_match_odds(odds_data):
+    home_odd = draw_odd = away_odd = "N/A"
+    if not odds_data or not isinstance(odds_data, list):
+        return home_odd, draw_odd, away_odd
+    for provider in odds_data:
+        if not isinstance(provider, dict):
+            continue
+        if home_odd == "N/A":
+            ml = provider.get("moneyline") or provider.get("moneyLine")
+            if isinstance(ml, dict):
+                home_info = ml.get("home", {})
+                if isinstance(home_info, dict):
+                    for period in ["close", "open"]:
+                        odd_entry = home_info.get(period, {})
+                        if isinstance(odd_entry, dict) and "odds" in odd_entry:
+                            res = parse_odd_value(odd_entry["odds"])
+                            if res:
+                                home_odd = res
+                                break
+        if away_odd == "N/A":
+            ml = provider.get("moneyline") or provider.get("moneyLine")
+            if isinstance(ml, dict):
+                away_info = ml.get("away", {})
+                if isinstance(away_info, dict):
+                    for period in ["close", "open"]:
+                        odd_entry = away_info.get(period, {})
+                        if isinstance(odd_entry, dict) and "odds" in odd_entry:
+                            res = parse_odd_value(odd_entry["odds"])
+                            if res:
+                                away_odd = res
+                                break
+        if draw_odd == "N/A":
+            draw_info = provider.get("drawOdds")
+            if isinstance(draw_info, dict):
+                res = parse_odd_value(draw_info.get("moneyLine"))
+                if res:
+                    draw_odd = res
+        if home_odd == "N/A":
+            for key in ["homeTeamOdds", "home", "homeOdds"]:
+                res = search_team_odd_in_dict(provider.get(key))
+                if res:
+                    home_odd = res
+                    break
+        if away_odd == "N/A":
+            for key in ["awayTeamOdds", "away", "awayOdds"]:
+                res = search_team_odd_in_dict(provider.get(key))
+                if res:
+                    away_odd = res
+                    break
+        if draw_odd == "N/A":
+            for key in ["draw", "drawOdds"]:
+                res = search_team_odd_in_dict(provider.get(key))
+                if res:
+                    draw_odd = res
+                    break
+        if home_odd != "N/A" and away_odd != "N/A" and draw_odd != "N/A":
+            break
+    return home_odd, draw_odd, away_odd
+
+# -------------------------------------------------------------
+# THE ODDS API — h2h extractor
+# -------------------------------------------------------------
+def extract_odds_api_h2h(event, is_hockey=False):
+    odd_1 = odd_X = odd_2 = "N/A"
+    home_team = event.get("home_team", "")
+    away_team = event.get("away_team", "")
+    for bookmaker in event.get("bookmakers", []):
+        for market in bookmaker.get("markets", []):
+            if market.get("key") != "h2h":
+                continue
+            for outcome in market.get("outcomes", []):
+                name  = outcome.get("name", "")
+                price = outcome.get("price")
+                price_str = f"{float(price):.2f}" if price and float(price) > 1.0 else "N/A"
+                if name == home_team and odd_1 == "N/A":
+                    odd_1 = price_str
+                elif name == away_team and odd_2 == "N/A":
+                    odd_2 = price_str
+                elif name in ("Draw", "draw") and odd_X == "N/A":
+                    odd_X = price_str
+            if odd_1 != "N/A" and odd_2 != "N/A":
+                break
+        if odd_1 != "N/A" and odd_2 != "N/A":
+            break
+    if is_hockey:
+        odd_X = "-"
+    return odd_1, odd_X, odd_2
+
+# No-draw sports
+NO_DRAW_SPORTS  = {"basketball", "hockey", "tennis"}
+NO_DRAW_LEAGUES = {"usa.nba", "usa.nhl", "atp", "wta"}
+
+
 @st.cache_data(ttl=120)
 def fetch_single_league(sport, league_code, league_name, flag_code, target_date, extra_params=""):
     """Fetch matches for an ESPN league on a specific day. Handles tennis tournaments too."""
