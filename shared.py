@@ -49,6 +49,8 @@ LEAGUE_LOGOS = {
     ("espn", "bra.1"):               "https://a.espncdn.com/i/leaguelogos/soccer/500/85.png",
     ("espn", "arg.1"):               "https://a.espncdn.com/i/leaguelogos/soccer/500/1.png",
     ("espn", "jpn.1"):               "https://a.espncdn.com/i/leaguelogos/soccer/500/2199.png",
+    ("espn", "bel.1"):               "https://a.espncdn.com/i/leaguelogos/soccer/500/6.png",
+    ("espn", "por.1"):               "https://a.espncdn.com/i/leaguelogos/soccer/500/14.png",
     # ESPN soccer — UEFA qualifiers (same logos as the main competitions)
     ("espn", "uefa.champions_qual"):   "https://a.espncdn.com/i/leaguelogos/soccer/500/2.png",
     ("espn", "uefa.europa_qual"):      "https://a.espncdn.com/i/leaguelogos/soccer/500/2310.png",
@@ -137,6 +139,8 @@ category_mapping = {
         ("espn", "soccer", "bra.1",  "Brazil - Série A",                "br"),
         ("espn", "soccer", "arg.1",  "Argentina - Liga Profesional",    "ar"),
         ("espn", "soccer", "jpn.1",  "Japan - J1 League",               "jp"),
+        ("espn", "soccer", "bel.1",  "Belgium - Pro League",            "be"),
+        ("espn", "soccer", "por.1",  "Portugal - Primeira Liga",        "pt"),
     ],
 }
 
@@ -150,10 +154,52 @@ ALL_EXTRA_LEAGUES = [
 ]
 
 odds_api_categories  = ["Finland"]
-excluded_from_all    = ["Filler Leagues", "🎾 Tennis"]
+excluded_from_all    = ["Filler Leagues", "Tennis"]
+
+# Display order — dashboard & calendar sort leagues by this list
+LEAGUE_DISPLAY_ORDER = [
+    ("espn", "uefa.champions"),
+    ("espn", "uefa.europa"),
+    ("espn", "uefa.europa.conf"),
+    ("espn", "uefa.super_cup"),
+    ("espn", "eng.1"),
+    ("espn", "esp.1"),
+    ("espn", "ger.1"),
+    ("espn", "ita.1"),
+    ("espn", "fra.1"),
+    ("espn", "eng.league_cup"),
+    ("espn", "eng.fa"),
+    ("espn", "esp.copa_del_rey"),
+    ("espn", "ger.dfb_pokal"),
+    ("espn", "ita.coppa_italia"),
+    ("espn", "fra.coupe_de_france"),
+    ("espn", "ned.1"),
+    ("espn", "ned.cup"),
+    ("espn", "swe.1"),
+    ("espn", "nor.1"),
+    ("espn", "ger.2"),
+    ("espn", "aut.1"),
+    ("espn", "tur.1"),
+    ("oddsapi", "soccer_finland_veikkausliiga"),
+    ("oddsapi", "icehockey_liiga"),
+    ("espn", "usa.nba"),
+    ("espn", "usa.nhl"),
+    ("espn", "atp"),
+    ("espn", "bra.1"),
+    ("espn", "arg.1"),
+    ("espn", "jpn.1"),
+    ("espn", "bel.1"),
+    ("espn", "por.1"),
+]
+
+def _league_sort_key(league):
+    key = ("espn", league[2]) if league[0] == "espn" else ("oddsapi", league[1])
+    try:
+        return LEAGUE_DISPLAY_ORDER.index(key)
+    except ValueError:
+        return len(LEAGUE_DISPLAY_ORDER)
 
 def get_all_leagues_unique():
-    """All unique leagues excluding Filler Leagues and Tennis."""
     all_leagues = []
     seen = set()
 
@@ -172,143 +218,8 @@ def get_all_leagues_unique():
     for league in ALL_EXTRA_LEAGUES:
         _add(league)
 
+    all_leagues.sort(key=_league_sort_key)
     return all_leagues
-
-# -------------------------------------------------------------
-# ODDS PARSER (ESPN American → Decimal)
-# -------------------------------------------------------------
-def parse_odd_value(raw):
-    if raw is None or raw == "":
-        return None
-    try:
-        if isinstance(raw, str) and (raw.startswith("+") or raw.startswith("-")):
-            val = float(raw)
-            if val > 0:
-                return f"{(val / 100.0) + 1.0:.2f}"
-            elif val < 0:
-                return f"{(100.0 / abs(val)) + 1.0:.2f}"
-        val = float(raw)
-        if val == 0:
-            return None
-        if 1.0 < val < 50.0:
-            return f"{val:.2f}"
-        elif val > 0:
-            return f"{(val / 100.0) + 1.0:.2f}"
-        elif val < 0:
-            return f"{(100.0 / abs(val)) + 1.0:.2f}"
-    except (ValueError, TypeError):
-        pass
-    return None
-
-def search_team_odd_in_dict(d):
-    if d is None:
-        return None
-    if not isinstance(d, dict):
-        return parse_odd_value(d)
-    for key in ["value", "moneyLine", "moneyline", "odds", "american", "decimal", "summary"]:
-        if key in d and d[key] is not None:
-            res = parse_odd_value(d[key])
-            if res:
-                return res
-    return None
-
-def extract_all_match_odds(odds_data):
-    home_odd = draw_odd = away_odd = "N/A"
-    if not odds_data or not isinstance(odds_data, list):
-        return home_odd, draw_odd, away_odd
-    for provider in odds_data:
-        if not isinstance(provider, dict):
-            continue
-        if home_odd == "N/A":
-            ml = provider.get("moneyline") or provider.get("moneyLine")
-            if isinstance(ml, dict):
-                home_info = ml.get("home", {})
-                if isinstance(home_info, dict):
-                    for period in ["close", "open"]:
-                        odd_entry = home_info.get(period, {})
-                        if isinstance(odd_entry, dict) and "odds" in odd_entry:
-                            res = parse_odd_value(odd_entry["odds"])
-                            if res:
-                                home_odd = res
-                                break
-        if away_odd == "N/A":
-            ml = provider.get("moneyline") or provider.get("moneyLine")
-            if isinstance(ml, dict):
-                away_info = ml.get("away", {})
-                if isinstance(away_info, dict):
-                    for period in ["close", "open"]:
-                        odd_entry = away_info.get(period, {})
-                        if isinstance(odd_entry, dict) and "odds" in odd_entry:
-                            res = parse_odd_value(odd_entry["odds"])
-                            if res:
-                                away_odd = res
-                                break
-        if draw_odd == "N/A":
-            draw_info = provider.get("drawOdds")
-            if isinstance(draw_info, dict):
-                res = parse_odd_value(draw_info.get("moneyLine"))
-                if res:
-                    draw_odd = res
-        if home_odd == "N/A":
-            for key in ["homeTeamOdds", "home", "homeOdds"]:
-                res = search_team_odd_in_dict(provider.get(key))
-                if res:
-                    home_odd = res
-                    break
-        if away_odd == "N/A":
-            for key in ["awayTeamOdds", "away", "awayOdds"]:
-                res = search_team_odd_in_dict(provider.get(key))
-                if res:
-                    away_odd = res
-                    break
-        if draw_odd == "N/A":
-            for key in ["draw", "drawOdds"]:
-                res = search_team_odd_in_dict(provider.get(key))
-                if res:
-                    draw_odd = res
-                    break
-        if home_odd != "N/A" and away_odd != "N/A" and draw_odd != "N/A":
-            break
-    return home_odd, draw_odd, away_odd
-
-# -------------------------------------------------------------
-# THE ODDS API — h2h extractor
-# -------------------------------------------------------------
-def extract_odds_api_h2h(event, is_hockey=False):
-    odd_1 = odd_X = odd_2 = "N/A"
-    home_team = event.get("home_team", "")
-    away_team = event.get("away_team", "")
-    for bookmaker in event.get("bookmakers", []):
-        for market in bookmaker.get("markets", []):
-            if market.get("key") != "h2h":
-                continue
-            for outcome in market.get("outcomes", []):
-                name  = outcome.get("name", "")
-                price = outcome.get("price")
-                price_str = f"{float(price):.2f}" if price and float(price) > 1.0 else "N/A"
-                if name == home_team and odd_1 == "N/A":
-                    odd_1 = price_str
-                elif name == away_team and odd_2 == "N/A":
-                    odd_2 = price_str
-                elif name in ("Draw", "draw") and odd_X == "N/A":
-                    odd_X = price_str
-            if odd_1 != "N/A" and odd_2 != "N/A":
-                break
-        if odd_1 != "N/A" and odd_2 != "N/A":
-            break
-    if is_hockey:
-        odd_X = "-"
-    return odd_1, odd_X, odd_2
-
-# -------------------------------------------------------------
-# NO-DRAW SPORTS
-# -------------------------------------------------------------
-NO_DRAW_SPORTS  = {"basketball", "hockey", "tennis"}
-NO_DRAW_LEAGUES = {"usa.nba", "usa.nhl", "atp", "wta"}
-
-# -------------------------------------------------------------
-# ESPN — single day fetcher
-# -------------------------------------------------------------
 @st.cache_data(ttl=120)
 def fetch_single_league(sport, league_code, league_name, flag_code, target_date, extra_params=""):
     """Fetch matches for an ESPN league on a specific day. Handles tennis tournaments too."""
