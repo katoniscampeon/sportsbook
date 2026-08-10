@@ -210,15 +210,21 @@ for promo in st.session_state.promos:
 # SPORT CLASSIFICATION
 # -------------------------------------------------------------
 def get_match_sport(match):
-    if match.get("Sport"):
-        return match["Sport"]
-    logo = match.get("League Logo", "").lower()
+    # "Sport" field is always set by shared.py — trust it first
+    sport = match.get("Sport", "")
+    if sport:
+        return sport
+    # Fallback heuristic (should rarely be needed)
+    logo   = match.get("League Logo", "").lower()
     league = match.get("Διοργάνωση", "").lower()
     if "nba" in logo or "basketball" in logo:
         return "basketball"
-    if "nhl" in logo or "liiga" in logo or "liiga" in league:
+    if "nhl" in logo or "icehockey" in logo:
         return "hockey"
-    if "tennis" in logo or "atp" in logo or "atp" in league or "open" in league:
+    # Only classify as hockey if league name explicitly says "liiga" but NOT "veikkausliiga"
+    if "liiga" in league and "veikkaus" not in league:
+        return "hockey"
+    if "tennis" in logo or "atp" in logo:
         return "tennis"
     return "soccer"
 
@@ -279,8 +285,9 @@ for i in range(num_days):
 
     nav_iso    = d.strftime("%Y-%m-%d")
     today_badge = '<span class="badge">ΣΗΜΕΡΑ</span>' if is_today else ""
-    # Use target="_self" to stay in same tab
-    date_cell  = f'<a href="?nav_date={nav_iso}" target="_self" class="dlink">{d.day}/{d.month} {day_name}{today_badge}</a>'
+    # JS: navigate parent window to dashboard with nav_date param (escapes iframe)
+    onclick = f"navToDate('{nav_iso}'); return false;"
+    date_cell  = f'<a href="#" onclick="{onclick}" class="dlink">{d.day}/{d.month} {day_name}{today_badge}</a>'
 
     s_html = sport_logos_html(day_matches, "soccer")
     b_html = sport_logos_html(day_matches, "basketball")
@@ -353,6 +360,14 @@ full_html = """<!DOCTYPE html>
   .empty { color:rgba(128,128,128,0.35); }
   .plabel { font-size:0.75rem; }
 </style>
+<script>
+function navToDate(isoDate) {
+    // Navigate the top-level window (not the iframe) to the Streamlit app
+    // with the nav_date query param so the dashboard picks it up via st.query_params
+    var base = window.top.location.href.split('?')[0];
+    window.top.location.href = base + '?nav_date=' + isoDate;
+}
+</script>
 </head>
 <body>
 """ + "".join(rows) + """
