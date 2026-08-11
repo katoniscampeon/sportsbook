@@ -11,14 +11,14 @@ from promo_store import load_promos, add_promo, delete_promo, dates_in_range
 
 st.set_page_config(page_title="Calendar View", page_icon="📅", layout="wide")
 
-# ---- Handle date navigation — triggered by native Streamlit buttons ----
-_nav_date = st.query_params.get("nav_date")
-if _nav_date:
+# ---- Check if a date was posted via the hidden input trick ----
+if "cal_clicked_date" in st.session_state and st.session_state.cal_clicked_date:
+    clicked = st.session_state.cal_clicked_date
+    st.session_state.cal_clicked_date = ""
     try:
-        st.session_state.selected_date = date.fromisoformat(_nav_date)
+        st.session_state.selected_date = date.fromisoformat(clicked)
     except Exception:
         pass
-    st.query_params.clear()
     st.switch_page("sportsbook_dashboard.py")
 
 st.markdown("""
@@ -26,20 +26,12 @@ st.markdown("""
         .block-container {padding-top: 1rem; padding-bottom: 0rem;}
         [data-testid="stSidebarNav"] { display: none !important; }
         [data-testid="stSidebarContent"] { padding-top: 1rem !important; }
-        /* Make date buttons look like links */
-        div[data-testid="stButton"] > button.cal-date-btn {
-            background: none !important;
-            border: none !important;
-            padding: 0 !important;
-            color: inherit !important;
-            font-weight: 600 !important;
-            font-size: 0.82rem !important;
-            text-align: left !important;
-            cursor: pointer !important;
-            white-space: nowrap !important;
-        }
-        div[data-testid="stButton"] > button.cal-date-btn:hover {
-            color: #e8a800 !important;
+        /* Hide the proxy text input completely */
+        div[data-testid="stTextInput"].nav-proxy {
+            position: absolute !important;
+            visibility: hidden !important;
+            height: 0 !important;
+            overflow: hidden !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -203,9 +195,9 @@ st.markdown(f"**{start_date.strftime('%d/%m/%Y')} — {end_date.strftime('%d/%m/
 # -------------------------------------------------------------
 # FETCH
 # -------------------------------------------------------------
-odds_api_key   = get_odds_api_key()
-all_leagues    = get_all_leagues_unique()
-tennis_leagues = category_mapping.get("🎾 Tennis", [])
+odds_api_key    = get_odds_api_key()
+all_leagues     = get_all_leagues_unique()
+tennis_leagues  = category_mapping.get("🎾 Tennis", [])
 all_cal_leagues = all_leagues + [l for l in tennis_leagues if l not in all_leagues]
 
 with st.spinner("Φόρτωση αγώνων..."):
@@ -241,7 +233,7 @@ def get_match_sport(match):
     return "soccer"
 
 def sport_logos_html(day_matches, sport_filter):
-    seen = set()
+    seen  = set()
     parts = []
     for m in day_matches:
         if get_match_sport(m) != sport_filter:
@@ -260,45 +252,23 @@ def sport_logos_html(day_matches, sport_filter):
     return '<span class="empty">—</span>'
 
 # -------------------------------------------------------------
-# LAYOUT: date column (native Streamlit buttons) + HTML table (logos/promos)
-# Each row is ROW_H px tall. We render months as CSS dividers inside the HTML.
+# BUILD FULL HTML TABLE (dates are clickable inside the table)
+# Clicking a date row sends a postMessage to the Streamlit parent,
+# which is caught by an inline <script> outside the iframe and sets
+# the hidden input → triggers st.rerun → st.switch_page
 # -------------------------------------------------------------
-ROW_H   = 30   # px per day row
-HDR_H   = 22   # px for month header
-THEAD_H = 22   # px for column headers
-
 month_names_gr     = ["Ιανουάριος","Φεβρουάριος","Μάρτιος","Απρίλιος","Μάιος","Ιούνιος",
                       "Ιούλιος","Αύγουστος","Σεπτέμβριος","Οκτώβριος","Νοέμβριος","Δεκέμβριος"]
 day_names_gr_short = ["Δευ","Τρι","Τετ","Πεμ","Παρ","Σαβ","Κυρ"]
 
-# Pre-compute all days info
-days_info = []
+html_rows     = []
+current_month = None
+
 for i in range(num_days):
     d         = start_date + timedelta(days=i)
     date_str  = d.strftime("%d/%m/%Y")
     day_name  = day_names_gr_short[d.weekday()]
     month_key = (d.month, d.year)
-    day_matches = matches_by_date.get(d, [])
-    day_promos  = promos_by_date.get(date_str, [])
-    is_today    = (d == effective_today)
-    days_info.append({
-        "d": d, "date_str": date_str, "day_name": day_name,
-        "month_key": month_key, "day_matches": day_matches,
-        "day_promos": day_promos, "is_today": is_today,
-    })
-
-# ---------------------------------------------------------------
-# Build HTML for the right side (logos + promos, NO date column)
-# ---------------------------------------------------------------
-html_rows   = []
-current_month = None
-
-for info in days_info:
-    d          = info["d"]
-    month_key  = info["month_key"]
-    day_matches= info["day_matches"]
-    day_promos = info["day_promos"]
-    is_today   = info["is_today"]
 
     if month_key != current_month:
         current_month = month_key
@@ -307,6 +277,7 @@ for info in days_info:
         html_rows.append(
             f'<div class="month-hdr">{month_names_gr[d.month-1]} {d.year}</div>'
             f'<table><thead><tr>'
+            f'<th class="h-date">Ημερομηνία</th>'
             f'<th class="h-soccer">⚽ Ποδόσφαιρο</th>'
             f'<th class="h-basket">🏀 Μπάσκετ</th>'
             f'<th class="h-tennis">🎾 Τένις</th>'
@@ -314,6 +285,17 @@ for info in days_info:
             f'<th class="h-promo">📋 Promos</th>'
             f'</tr></thead><tbody>'
         )
+
+    day_matches = matches_by_date.get(d, [])
+    day_promos  = promos_by_date.get(date_str, [])
+    is_today    = (d == effective_today)
+    nav_iso     = d.strftime("%Y-%m-%d")
+
+    today_badge  = '<span class="badge">ΣΗΜΕΡΑ</span>' if is_today else ""
+    date_cell    = (
+        f'<a href="#" class="dlink" onclick="sendDate(\'{nav_iso}\'); return false;">'
+        f'{d.day}/{d.month} {day_name}{today_badge}</a>'
+    )
 
     s_html = sport_logos_html(day_matches, "soccer")
     b_html = sport_logos_html(day_matches, "basketball")
@@ -334,6 +316,7 @@ for info in days_info:
     row_cls = "today" if is_today else ""
     html_rows.append(
         f'<tr class="{row_cls}">'
+        f'<td class="c-date">{date_cell}</td>'
         f'<td class="c-soccer">{s_html}</td>'
         f'<td class="c-basket">{b_html}</td>'
         f'<td class="c-tennis">{t_html}</td>'
@@ -344,60 +327,14 @@ for info in days_info:
 
 html_rows.append("</tbody></table>")
 
-# ---------------------------------------------------------------
-# Render: left col = native Streamlit date buttons, right col = HTML
-# ---------------------------------------------------------------
-# Column header row
-hdr_left, hdr_right = st.columns([1, 7])
-with hdr_left:
-    st.markdown(
-        '<div style="font-size:0.7rem;font-weight:700;color:rgba(128,128,128,0.6);'
-        'padding:3px 0 2px;border-bottom:1px solid rgba(128,128,128,0.18);'
-        'background:rgba(128,128,128,0.03);">Ημερομηνία</div>',
-        unsafe_allow_html=True
-    )
-with hdr_right:
-    pass  # header is inside the HTML table
-
-# One row per day
-# We wrap everything inside a container for visual alignment
-left_col, right_col = st.columns([1, 7])
-
-with left_col:
-    for info in days_info:
-        d        = info["d"]
-        day_name = info["day_name"]
-        is_today = info["is_today"]
-        month_key= info["month_key"]
-
-        # Month spacer — matches the month header height in the HTML
-        if not hasattr(left_col, "_last_month"):
-            left_col._last_month = None
-        if month_key != left_col._last_month:
-            left_col._last_month = month_key
-            # spacer for month header row + thead row
-            st.markdown(
-                f'<div style="height:{HDR_H + THEAD_H + 8}px;"></div>',
-                unsafe_allow_html=True
-            )
-
-        today_marker = " 🟡" if is_today else ""
-        label = f"{d.day}/{d.month} {day_name}{today_marker}"
-
-        # Native Streamlit button — clicking navigates to dashboard on that date
-        if st.button(label, key=f"cal_day_{d.isoformat()}", use_container_width=True):
-            st.session_state.selected_date = d
-            st.switch_page("sportsbook_dashboard.py")
-
-with right_col:
-    full_html = """<!DOCTYPE html>
+full_html = """<!DOCTYPE html>
 <html>
 <head>
 <style>
   body { margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,sans-serif; font-size:0.82rem; color:inherit; }
   .month-hdr {
     font-size:1.0rem; font-weight:700;
-    margin-top:8px; margin-bottom:2px; padding-bottom:2px;
+    margin-top:12px; margin-bottom:2px; padding-bottom:2px;
     border-bottom:2px solid rgba(128,128,128,0.25);
   }
   table { width:100%; border-collapse:collapse; table-layout:fixed; margin-bottom:2px; }
@@ -408,24 +345,101 @@ with right_col:
     background:rgba(128,128,128,0.03);
   }
   td { padding:3px 6px; border-bottom:1px solid rgba(128,128,128,0.08); vertical-align:middle; overflow:hidden; }
-  tr:hover td { background-color:rgba(128,128,128,0.05); }
+  tr:hover td { background-color:rgba(128,128,128,0.06); }
   tr.today td { background-color:rgba(255,200,0,0.07); border-left:3px solid #e8a800; }
-  .h-soccer,.c-soccer { width:32%; }
-  .h-basket,.c-basket { width:13%; }
-  .h-tennis,.c-tennis { width:11%; }
-  .h-hockey,.c-hockey { width:11%; }
-  .h-promo, .c-promo  { width:33%; }
+
+  .h-date, .c-date { width:95px; white-space:nowrap; }
+  .h-soccer,.c-soccer { width:29%; }
+  .h-basket,.c-basket { width:12%; }
+  .h-tennis,.c-tennis { width:10%; }
+  .h-hockey,.c-hockey { width:10%; }
+  .h-promo, .c-promo  { width:26%; }
+
+  .dlink {
+    color: inherit; text-decoration: none;
+    font-weight: 600; font-size: 0.82rem;
+  }
+  .dlink:hover { color: #e8a800; text-decoration: underline; cursor: pointer; }
+
+  .badge {
+    font-size:0.6rem; background:#e8a800; color:#000;
+    border-radius:3px; padding:0 3px; margin-left:3px;
+    font-weight:700; vertical-align:middle;
+  }
   .empty { color:rgba(128,128,128,0.35); }
   .logos { display:flex; flex-wrap:wrap; gap:3px; align-items:center; }
   .logos img { width:22px; height:22px; object-fit:contain; border-radius:2px; }
   .pl { font-size:0.75rem; }
 </style>
+<script>
+  function sendDate(isoDate) {
+    // Post message to Streamlit parent frame with the chosen date
+    window.parent.postMessage({type: "cal_nav", date: isoDate}, "*");
+  }
+</script>
 </head>
 <body>
 """ + "".join(html_rows) + """
 </body>
 </html>"""
 
-    # Estimate height: 90 days * ~29px + 4 months * ~50px overhead
-    estimated_height = num_days * 29 + 4 * 55 + 60
-    components.html(full_html, height=estimated_height, scrolling=False)
+estimated_height = num_days * 29 + 4 * 55 + 80
+components.html(full_html, height=estimated_height, scrolling=True)
+
+# -------------------------------------------------------------
+# POSTMESSAGE LISTENER — receives the date from the iframe
+# and triggers a Streamlit rerun via a hidden text_input
+# -------------------------------------------------------------
+# This JS runs in the Streamlit page (outside the iframe)
+# It listens for postMessage and writes the date into the
+# hidden input, which triggers an on_change → rerun → switch_page
+if "cal_clicked_date" not in st.session_state:
+    st.session_state.cal_clicked_date = ""
+
+listener_js = """
+<script>
+(function() {
+    window.addEventListener("message", function(event) {
+        if (event.data && event.data.type === "cal_nav") {
+            var isoDate = event.data.date;
+            // Find Streamlit's hidden input by label and set its value
+            var inputs = window.parent.document.querySelectorAll(
+                'input[aria-label="__cal_nav_proxy__"]'
+            );
+            if (inputs.length > 0) {
+                var nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+                    window.HTMLInputElement.prototype, 'value'
+                ).set;
+                nativeInputValueSetter.call(inputs[0], isoDate);
+                inputs[0].dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        }
+    }, false);
+})();
+</script>
+"""
+st.markdown(listener_js, unsafe_allow_html=True)
+
+# Hidden proxy input — when it changes, we navigate
+def _on_nav_change():
+    val = st.session_state.get("__cal_nav_input__", "")
+    if val:
+        st.session_state.cal_clicked_date = val
+        st.session_state["__cal_nav_input__"] = ""
+
+st.text_input(
+    "__cal_nav_proxy__",
+    key="__cal_nav_input__",
+    label_visibility="hidden",
+    on_change=_on_nav_change,
+)
+
+# Trigger the switch if a date was captured
+if st.session_state.get("cal_clicked_date"):
+    clicked = st.session_state.cal_clicked_date
+    st.session_state.cal_clicked_date = ""
+    try:
+        st.session_state.selected_date = date.fromisoformat(clicked)
+    except Exception:
+        pass
+    st.switch_page("sportsbook_dashboard.py")
