@@ -11,7 +11,7 @@ from promo_store import load_promos, add_promo, delete_promo, dates_in_range
 
 st.set_page_config(page_title="Calendar View", page_icon="📅", layout="wide")
 
-# ---- Handle date navigation — same tab redirect via st.switch_page ----
+# ---- Handle date navigation — triggered by native Streamlit buttons ----
 _nav_date = st.query_params.get("nav_date")
 if _nav_date:
     try:
@@ -26,6 +26,21 @@ st.markdown("""
         .block-container {padding-top: 1rem; padding-bottom: 0rem;}
         [data-testid="stSidebarNav"] { display: none !important; }
         [data-testid="stSidebarContent"] { padding-top: 1rem !important; }
+        /* Make date buttons look like links */
+        div[data-testid="stButton"] > button.cal-date-btn {
+            background: none !important;
+            border: none !important;
+            padding: 0 !important;
+            color: inherit !important;
+            font-weight: 600 !important;
+            font-size: 0.82rem !important;
+            text-align: left !important;
+            cursor: pointer !important;
+            white-space: nowrap !important;
+        }
+        div[data-testid="stButton"] > button.cal-date-btn:hover {
+            color: #e8a800 !important;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -210,18 +225,15 @@ for promo in st.session_state.promos:
 # SPORT CLASSIFICATION
 # -------------------------------------------------------------
 def get_match_sport(match):
-    # "Sport" field is always set by shared.py — trust it first
     sport = match.get("Sport", "")
     if sport:
         return sport
-    # Fallback heuristic (should rarely be needed)
     logo   = match.get("League Logo", "").lower()
     league = match.get("Διοργάνωση", "").lower()
     if "nba" in logo or "basketball" in logo:
         return "basketball"
     if "nhl" in logo or "icehockey" in logo:
         return "hockey"
-    # Only classify as hockey if league name explicitly says "liiga" but NOT "veikkausliiga"
     if "liiga" in league and "veikkaus" not in league:
         return "hockey"
     if "tennis" in logo or "atp" in logo:
@@ -248,29 +260,53 @@ def sport_logos_html(day_matches, sport_filter):
     return '<span class="empty">—</span>'
 
 # -------------------------------------------------------------
-# BUILD HTML
+# LAYOUT: date column (native Streamlit buttons) + HTML table (logos/promos)
+# Each row is ROW_H px tall. We render months as CSS dividers inside the HTML.
 # -------------------------------------------------------------
+ROW_H   = 30   # px per day row
+HDR_H   = 22   # px for month header
+THEAD_H = 22   # px for column headers
+
 month_names_gr     = ["Ιανουάριος","Φεβρουάριος","Μάρτιος","Απρίλιος","Μάιος","Ιούνιος",
                       "Ιούλιος","Αύγουστος","Σεπτέμβριος","Οκτώβριος","Νοέμβριος","Δεκέμβριος"]
 day_names_gr_short = ["Δευ","Τρι","Τετ","Πεμ","Παρ","Σαβ","Κυρ"]
 
-rows = []
-current_month = None
-
+# Pre-compute all days info
+days_info = []
 for i in range(num_days):
     d         = start_date + timedelta(days=i)
     date_str  = d.strftime("%d/%m/%Y")
     day_name  = day_names_gr_short[d.weekday()]
     month_key = (d.month, d.year)
+    day_matches = matches_by_date.get(d, [])
+    day_promos  = promos_by_date.get(date_str, [])
+    is_today    = (d == effective_today)
+    days_info.append({
+        "d": d, "date_str": date_str, "day_name": day_name,
+        "month_key": month_key, "day_matches": day_matches,
+        "day_promos": day_promos, "is_today": is_today,
+    })
+
+# ---------------------------------------------------------------
+# Build HTML for the right side (logos + promos, NO date column)
+# ---------------------------------------------------------------
+html_rows   = []
+current_month = None
+
+for info in days_info:
+    d          = info["d"]
+    month_key  = info["month_key"]
+    day_matches= info["day_matches"]
+    day_promos = info["day_promos"]
+    is_today   = info["is_today"]
 
     if month_key != current_month:
         current_month = month_key
-        if i > 0:
-            rows.append("</tbody></table>")
-        rows.append(
+        if html_rows:
+            html_rows.append("</tbody></table>")
+        html_rows.append(
             f'<div class="month-hdr">{month_names_gr[d.month-1]} {d.year}</div>'
             f'<table><thead><tr>'
-            f'<th class="h-date">Ημερομηνία</th>'
             f'<th class="h-soccer">⚽ Ποδόσφαιρο</th>'
             f'<th class="h-basket">🏀 Μπάσκετ</th>'
             f'<th class="h-tennis">🎾 Τένις</th>'
@@ -278,16 +314,6 @@ for i in range(num_days):
             f'<th class="h-promo">📋 Promos</th>'
             f'</tr></thead><tbody>'
         )
-
-    day_matches = matches_by_date.get(d, [])
-    day_promos  = promos_by_date.get(date_str, [])
-    is_today    = (d == effective_today)
-
-    nav_iso    = d.strftime("%Y-%m-%d")
-    today_badge = '<span class="badge">ΣΗΜΕΡΑ</span>' if is_today else ""
-    # JS: navigate parent window to dashboard with nav_date param (escapes iframe)
-    onclick = f"navToDate('{nav_iso}'); return false;"
-    date_cell  = f'<a href="#" onclick="{onclick}" class="dlink">{d.day}/{d.month} {day_name}{today_badge}</a>'
 
     s_html = sport_logos_html(day_matches, "soccer")
     b_html = sport_logos_html(day_matches, "basketball")
@@ -299,16 +325,15 @@ for i in range(num_days):
         for p in day_promos:
             label = p.get("match") or p.get("championship") or p.get("other") or "—"
             icon  = "🏟️" if p.get("match") else ("🏆" if p.get("championship") else "📝")
-            short = label[:48] + ("…" if len(label) > 48 else "")
-            p_parts.append(f"<b>{p['type']}</b> {icon} <span class='plabel'>{short}</span>")
+            short = label[:45] + ("…" if len(label) > 45 else "")
+            p_parts.append(f"<b>{p['type']}</b> {icon} <span class='pl'>{short}</span>")
         promo_html = "<br>".join(p_parts)
     else:
         promo_html = '<span class="empty">—</span>'
 
     row_cls = "today" if is_today else ""
-    rows.append(
+    html_rows.append(
         f'<tr class="{row_cls}">'
-        f'<td class="c-date">{date_cell}</td>'
         f'<td class="c-soccer">{s_html}</td>'
         f'<td class="c-basket">{b_html}</td>'
         f'<td class="c-tennis">{t_html}</td>'
@@ -317,62 +342,90 @@ for i in range(num_days):
         f'</tr>'
     )
 
-rows.append("</tbody></table>")
+html_rows.append("</tbody></table>")
 
-full_html = """<!DOCTYPE html>
+# ---------------------------------------------------------------
+# Render: left col = native Streamlit date buttons, right col = HTML
+# ---------------------------------------------------------------
+# Column header row
+hdr_left, hdr_right = st.columns([1, 7])
+with hdr_left:
+    st.markdown(
+        '<div style="font-size:0.7rem;font-weight:700;color:rgba(128,128,128,0.6);'
+        'padding:3px 0 2px;border-bottom:1px solid rgba(128,128,128,0.18);'
+        'background:rgba(128,128,128,0.03);">Ημερομηνία</div>',
+        unsafe_allow_html=True
+    )
+with hdr_right:
+    pass  # header is inside the HTML table
+
+# One row per day
+# We wrap everything inside a container for visual alignment
+left_col, right_col = st.columns([1, 7])
+
+with left_col:
+    for info in days_info:
+        d        = info["d"]
+        day_name = info["day_name"]
+        is_today = info["is_today"]
+        month_key= info["month_key"]
+
+        # Month spacer — matches the month header height in the HTML
+        if not hasattr(left_col, "_last_month"):
+            left_col._last_month = None
+        if month_key != left_col._last_month:
+            left_col._last_month = month_key
+            # spacer for month header row + thead row
+            st.markdown(
+                f'<div style="height:{HDR_H + THEAD_H + 8}px;"></div>',
+                unsafe_allow_html=True
+            )
+
+        today_marker = " 🟡" if is_today else ""
+        label = f"{d.day}/{d.month} {day_name}{today_marker}"
+
+        # Native Streamlit button — clicking navigates to dashboard on that date
+        if st.button(label, key=f"cal_day_{d.isoformat()}", use_container_width=True):
+            st.session_state.selected_date = d
+            st.switch_page("sportsbook_dashboard.py")
+
+with right_col:
+    full_html = """<!DOCTYPE html>
 <html>
 <head>
 <style>
   body { margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,sans-serif; font-size:0.82rem; color:inherit; }
   .month-hdr {
-    font-size:1.05rem; font-weight:700;
-    margin-top:16px; margin-bottom:2px; padding-bottom:3px;
+    font-size:1.0rem; font-weight:700;
+    margin-top:8px; margin-bottom:2px; padding-bottom:2px;
     border-bottom:2px solid rgba(128,128,128,0.25);
   }
-  table { width:100%; border-collapse:collapse; table-layout:fixed; margin-bottom:4px; }
+  table { width:100%; border-collapse:collapse; table-layout:fixed; margin-bottom:2px; }
   th {
     font-size:0.7rem; color:rgba(128,128,128,0.6); font-weight:700;
     text-align:left; padding:3px 6px 2px;
     border-bottom:1px solid rgba(128,128,128,0.18);
     background:rgba(128,128,128,0.03);
   }
-  td { padding:4px 6px; border-bottom:1px solid rgba(128,128,128,0.08); vertical-align:middle; overflow:hidden; }
+  td { padding:3px 6px; border-bottom:1px solid rgba(128,128,128,0.08); vertical-align:middle; overflow:hidden; }
   tr:hover td { background-color:rgba(128,128,128,0.05); }
   tr.today td { background-color:rgba(255,200,0,0.07); border-left:3px solid #e8a800; }
-
-  /* Fixed column widths */
-  .h-date, .c-date  { width:90px; white-space:nowrap; }
-  .h-soccer,.c-soccer { width:28%; }
-  .h-basket,.c-basket { width:11%; }
-  .h-tennis,.c-tennis { width:10%; }
-  .h-hockey,.c-hockey { width:10%; }
-  .h-promo, .c-promo  { width:26%; }
-
-  .dlink { color:inherit; text-decoration:none; font-weight:600; }
-  .dlink:hover { color:#e8a800; text-decoration:underline; }
-  .badge {
-    font-size:0.62rem; background:#e8a800; color:#000;
-    border-radius:3px; padding:0 3px; margin-left:4px;
-    font-weight:700; vertical-align:middle;
-  }
+  .h-soccer,.c-soccer { width:32%; }
+  .h-basket,.c-basket { width:13%; }
+  .h-tennis,.c-tennis { width:11%; }
+  .h-hockey,.c-hockey { width:11%; }
+  .h-promo, .c-promo  { width:33%; }
+  .empty { color:rgba(128,128,128,0.35); }
   .logos { display:flex; flex-wrap:wrap; gap:3px; align-items:center; }
   .logos img { width:22px; height:22px; object-fit:contain; border-radius:2px; }
-  .empty { color:rgba(128,128,128,0.35); }
-  .plabel { font-size:0.75rem; }
+  .pl { font-size:0.75rem; }
 </style>
-<script>
-function navToDate(isoDate) {
-    // Navigate the top-level window (not the iframe) to the Streamlit app
-    // with the nav_date query param so the dashboard picks it up via st.query_params
-    var base = window.top.location.href.split('?')[0];
-    window.top.location.href = base + '?nav_date=' + isoDate;
-}
-</script>
 </head>
 <body>
-""" + "".join(rows) + """
+""" + "".join(html_rows) + """
 </body>
 </html>"""
 
-estimated_height = num_days * 29 + 4 * 60 + 150
-components.html(full_html, height=estimated_height, scrolling=True)
+    # Estimate height: 90 days * ~29px + 4 months * ~50px overhead
+    estimated_height = num_days * 29 + 4 * 55 + 60
+    components.html(full_html, height=estimated_height, scrolling=False)
