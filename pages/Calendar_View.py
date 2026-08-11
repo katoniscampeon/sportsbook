@@ -9,30 +9,19 @@ from shared import (
 )
 from promo_store import load_promos, add_promo, delete_promo, dates_in_range
 
-st.set_page_config(page_title="Calendar View", page_icon="📅", layout="wide")
+_nav = st.query_params.get('cal_nav', '')
+if _nav:
+    st.session_state.selected_date = date.fromisoformat(_nav)
+    st.query_params.clear()
+    st.switch_page('sportsbook_dashboard.py')
 
-# ---- Check if a date was posted via the hidden input trick ----
-if "cal_clicked_date" in st.session_state and st.session_state.cal_clicked_date:
-    clicked = st.session_state.cal_clicked_date
-    st.session_state.cal_clicked_date = ""
-    try:
-        st.session_state.selected_date = date.fromisoformat(clicked)
-    except Exception:
-        pass
-    st.switch_page("sportsbook_dashboard.py")
+st.set_page_config(page_title="Calendar View", page_icon="📅", layout="wide")
 
 st.markdown("""
     <style>
         .block-container {padding-top: 1rem; padding-bottom: 0rem;}
         [data-testid="stSidebarNav"] { display: none !important; }
         [data-testid="stSidebarContent"] { padding-top: 1rem !important; }
-        /* Hide the proxy text input completely */
-        div[data-testid="stTextInput"].nav-proxy {
-            position: absolute !important;
-            visibility: hidden !important;
-            height: 0 !important;
-            overflow: hidden !important;
-        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -253,9 +242,6 @@ def sport_logos_html(day_matches, sport_filter):
 
 # -------------------------------------------------------------
 # BUILD FULL HTML TABLE (dates are clickable inside the table)
-# Clicking a date row sends a postMessage to the Streamlit parent,
-# which is caught by an inline <script> outside the iframe and sets
-# the hidden input → triggers st.rerun → st.switch_page
 # -------------------------------------------------------------
 month_names_gr     = ["Ιανουάριος","Φεβρουάριος","Μάρτιος","Απρίλιος","Μάιος","Ιούνιος",
                       "Ιούλιος","Αύγουστος","Σεπτέμβριος","Οκτώβριος","Νοέμβριος","Δεκέμβριος"]
@@ -292,10 +278,8 @@ for i in range(num_days):
     nav_iso     = d.strftime("%Y-%m-%d")
 
     today_badge  = '<span class="badge">ΣΗΜΕΡΑ</span>' if is_today else ""
-    date_cell    = (
-        f'<a href="#" class="dlink" onclick="sendDate(\'{nav_iso}\'); return false;">'
-        f'{d.day}/{d.month} {day_name}{today_badge}</a>'
-    )
+    onclick_js   = f"window.parent.location.href = window.parent.location.href.replace(/\\/Calendar_View[^?#]*/, '') + '?cal_nav={nav_iso}';"
+    date_cell    = f'<a href="#" class="dlink" onclick="{onclick_js} return false;">{d.day}/{d.month} {day_name}{today_badge}</a>'
 
     s_html = sport_logos_html(day_matches, "soccer")
     b_html = sport_logos_html(day_matches, "basketball")
@@ -371,12 +355,6 @@ full_html = """<!DOCTYPE html>
   .logos img { width:22px; height:22px; object-fit:contain; border-radius:2px; }
   .pl { font-size:0.75rem; }
 </style>
-<script>
-  function sendDate(isoDate) {
-    // Post message to Streamlit parent frame with the chosen date
-    window.parent.postMessage({type: "cal_nav", date: isoDate}, "*");
-  }
-</script>
 </head>
 <body>
 """ + "".join(html_rows) + """
@@ -385,61 +363,3 @@ full_html = """<!DOCTYPE html>
 
 estimated_height = num_days * 29 + 4 * 55 + 80
 components.html(full_html, height=estimated_height, scrolling=True)
-
-# -------------------------------------------------------------
-# POSTMESSAGE LISTENER — receives the date from the iframe
-# and triggers a Streamlit rerun via a hidden text_input
-# -------------------------------------------------------------
-# This JS runs in the Streamlit page (outside the iframe)
-# It listens for postMessage and writes the date into the
-# hidden input, which triggers an on_change → rerun → switch_page
-if "cal_clicked_date" not in st.session_state:
-    st.session_state.cal_clicked_date = ""
-
-listener_js = """
-<script>
-(function() {
-    window.addEventListener("message", function(event) {
-        if (event.data && event.data.type === "cal_nav") {
-            var isoDate = event.data.date;
-            // Find Streamlit's hidden input by label and set its value
-            var inputs = window.parent.document.querySelectorAll(
-                'input[aria-label="__cal_nav_proxy__"]'
-            );
-            if (inputs.length > 0) {
-                var nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-                    window.HTMLInputElement.prototype, 'value'
-                ).set;
-                nativeInputValueSetter.call(inputs[0], isoDate);
-                inputs[0].dispatchEvent(new Event('input', { bubbles: true }));
-            }
-        }
-    }, false);
-})();
-</script>
-"""
-st.markdown(listener_js, unsafe_allow_html=True)
-
-# Hidden proxy input — when it changes, we navigate
-def _on_nav_change():
-    val = st.session_state.get("__cal_nav_input__", "")
-    if val:
-        st.session_state.cal_clicked_date = val
-        st.session_state["__cal_nav_input__"] = ""
-
-st.text_input(
-    "__cal_nav_proxy__",
-    key="__cal_nav_input__",
-    label_visibility="hidden",
-    on_change=_on_nav_change,
-)
-
-# Trigger the switch if a date was captured
-if st.session_state.get("cal_clicked_date"):
-    clicked = st.session_state.cal_clicked_date
-    st.session_state.cal_clicked_date = ""
-    try:
-        st.session_state.selected_date = date.fromisoformat(clicked)
-    except Exception:
-        pass
-    st.switch_page("sportsbook_dashboard.py")

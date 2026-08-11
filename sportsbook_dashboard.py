@@ -11,6 +11,14 @@ from shared import (
 )
 from promo_store import load_promos, save_promos, add_promo, delete_promo, dates_in_range
 
+_nav = st.query_params.get('cal_nav', '')
+if _nav:
+    try:
+        st.session_state.selected_date = date.fromisoformat(_nav)
+    except Exception:
+        pass
+    st.query_params.clear()
+
 # -------------------------------------------------------------
 # 1. PAGE CONFIGURATION & STYLING
 # -------------------------------------------------------------
