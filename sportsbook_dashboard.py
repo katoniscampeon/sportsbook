@@ -4,7 +4,7 @@ from datetime import datetime, date, timedelta
 from shared import (
     session, athens_tz, now_athens, effective_today, ODDS_API_BASE,
     categories_info, category_mapping, odds_api_categories,
-    get_all_leagues_unique,
+    get_all_leagues_unique, get_custom_league_order, priority_dialog,
     parse_odd_value, search_team_odd_in_dict, extract_all_match_odds,
     extract_odds_api_h2h,
     fetch_single_league, fetch_odds_api_league, fetch_all_matches_parallel,
@@ -269,6 +269,9 @@ with view_col1:
 with view_col2:
     if st.button("📅 Calendar", key="nav_cal", use_container_width=True, type="secondary"):
         st.switch_page("pages/Calendar_View.py")
+
+if st.sidebar.button("🏆 Priority", use_container_width=True):
+    priority_dialog()
 
 st.sidebar.divider()
 

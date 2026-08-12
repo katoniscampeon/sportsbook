@@ -3,8 +3,8 @@ import streamlit.components.v1 as components
 from datetime import date, timedelta, datetime
 from shared import (
     athens_tz, now_athens, effective_today,
-    get_all_leagues_unique, fetch_all_matches_for_range,
-    fetch_all_matches_parallel,
+    get_all_leagues_unique, get_custom_league_order, priority_dialog,
+    fetch_all_matches_for_range, fetch_all_matches_parallel,
     category_mapping, _league_sort_key,
 )
 from promo_store import load_promos, add_promo, delete_promo, dates_in_range
@@ -145,6 +145,9 @@ with view_col2:
     if st.button("📅 Calendar", key="nav_cal", use_container_width=True, type="primary"):
         pass
 
+if st.sidebar.button("🏆 Priority", use_container_width=True):
+    priority_dialog()
+
 st.sidebar.divider()
 st.sidebar.markdown("**Πλοήγηση**")
 if "cal_start_date" not in st.session_state:
@@ -185,7 +188,8 @@ st.markdown(f"**{start_date.strftime('%d/%m/%Y')} — {end_date.strftime('%d/%m/
 # FETCH
 # -------------------------------------------------------------
 odds_api_key    = get_odds_api_key()
-all_leagues     = get_all_leagues_unique()
+custom_order    = get_custom_league_order()
+all_leagues     = get_all_leagues_unique(custom_order)
 tennis_leagues  = category_mapping.get("🎾 Tennis", [])
 all_cal_leagues = all_leagues + [l for l in tennis_leagues if l not in all_leagues]
 

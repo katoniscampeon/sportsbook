@@ -192,14 +192,96 @@ LEAGUE_DISPLAY_ORDER = [
     ("espn", "por.1"),
 ]
 
-def _league_sort_key(league):
+def get_custom_league_order():
+    """Returns the custom league order from session_state, or the default LEAGUE_DISPLAY_ORDER."""
+    if hasattr(st, "session_state") and "custom_league_order" in st.session_state:
+        return st.session_state.custom_league_order
+    return LEAGUE_DISPLAY_ORDER
+
+
+def _league_sort_key(league, custom_order=None):
+    order = custom_order if custom_order is not None else get_custom_league_order()
     key = ("espn", league[2]) if league[0] == "espn" else ("oddsapi", league[1])
     try:
-        return LEAGUE_DISPLAY_ORDER.index(key)
+        return order.index(key)
     except ValueError:
-        return len(LEAGUE_DISPLAY_ORDER)
+        return len(order)
 
-def get_all_leagues_unique():
+
+@st.dialog("🏆 Priority Ordering", width="large")
+def priority_dialog():
+    """Dialog to reorder leagues with up/down buttons."""
+    if "custom_league_order" not in st.session_state:
+        st.session_state.custom_league_order = list(LEAGUE_DISPLAY_ORDER)
+
+    order = list(st.session_state.custom_league_order)
+
+    def lg_key(l):
+        return ("espn", l[2]) if l[0] == "espn" else ("oddsapi", l[1])
+
+    def lg_name(l):
+        return l[3] if l[0] == "espn" else l[2]
+
+    def lg_logo(l):
+        src  = l[0]
+        code = l[2] if src == "espn" else l[1]
+        return LEAGUE_LOGOS.get((src, code), "")
+
+    all_lg = get_all_leagues_unique(custom_order=order)
+
+    # Ensure any league not yet in order is appended
+    for lg in all_lg:
+        k = lg_key(lg)
+        if k not in order:
+            order.append(k)
+
+    st.markdown("Χρησιμοποίησε τα βελάκια για να αλλάξεις σειρά:")
+    st.markdown("")
+
+    for i, lg in enumerate(all_lg):
+        key  = lg_key(lg)
+        name = lg_name(lg)
+        logo = lg_logo(lg)
+        c_logo, c_name, c_up, c_dn = st.columns([0.5, 6, 1, 1])
+        with c_logo:
+            if logo:
+                st.image(logo, width=20)
+        with c_name:
+            st.markdown(f"**{name}**")
+        with c_up:
+            if i > 0 and st.button("▲", key=f"prio_up_{i}"):
+                prev_key = lg_key(all_lg[i - 1])
+                ki = order.index(key)       if key      in order else -1
+                pi = order.index(prev_key) if prev_key in order else -1
+                if ki >= 0 and pi >= 0:
+                    order[ki], order[pi] = order[pi], order[ki]
+                    st.session_state.custom_league_order = order
+                st.rerun()
+        with c_dn:
+            if i < len(all_lg) - 1 and st.button("▼", key=f"prio_dn_{i}"):
+                next_key = lg_key(all_lg[i + 1])
+                ki = order.index(key)       if key      in order else -1
+                ni = order.index(next_key) if next_key in order else -1
+                if ki >= 0 and ni >= 0:
+                    order[ki], order[ni] = order[ni], order[ki]
+                    st.session_state.custom_league_order = order
+                st.rerun()
+
+    st.divider()
+    c_save, c_reset = st.columns(2)
+    with c_save:
+        if st.button("💾 Αποθήκευση", type="primary", use_container_width=True):
+            st.session_state.custom_league_order = order
+            st.rerun()
+    with c_reset:
+        if st.button("🔄 Reset Default", use_container_width=True):
+            st.session_state.custom_league_order = list(LEAGUE_DISPLAY_ORDER)
+            st.rerun()
+
+
+def get_all_leagues_unique(custom_order=None):
+    if custom_order is None:
+        custom_order = get_custom_league_order()
     all_leagues = []
     seen = set()
 
@@ -218,7 +300,7 @@ def get_all_leagues_unique():
     for league in ALL_EXTRA_LEAGUES:
         _add(league)
 
-    all_leagues.sort(key=_league_sort_key)
+    all_leagues.sort(key=lambda l: _league_sort_key(l, custom_order))
     return all_leagues
 # -------------------------------------------------------------
 # ODDS PARSER (ESPN American → Decimal)
