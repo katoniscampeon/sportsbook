@@ -259,125 +259,134 @@ def sport_logos_html(day_matches, sport_filter, custom_order=None):
     return '<span class="empty">—</span>'
 
 # -------------------------------------------------------------
-# BUILD FULL HTML TABLE (dates are clickable inside the table)
+# BUILD CALENDAR — native Streamlit rows (date = st.button)
 # -------------------------------------------------------------
 month_names_gr     = ["Ιανουάριος","Φεβρουάριος","Μάρτιος","Απρίλιος","Μάιος","Ιούνιος",
                       "Ιούλιος","Αύγουστος","Σεπτέμβριος","Οκτώβριος","Νοέμβριος","Δεκέμβριος"]
 day_names_gr_short = ["Δευ","Τρι","Τετ","Πεμ","Παρ","Σαβ","Κυρ"]
 
-html_rows     = []
+# Column proportions: date | soccer | basketball | tennis | hockey | promos
+COL_W = [1.1, 3.2, 1.3, 1.0, 1.0, 2.6]
+
+# Shared CSS injected once
+st.markdown("""
+<style>
+/* Calendar table styling */
+.cal-header { font-size:0.7rem; color:rgba(128,128,128,0.6); font-weight:700;
+              padding:2px 0; border-bottom:1px solid rgba(128,128,128,0.18); }
+.cal-logos  { display:flex; flex-wrap:wrap; gap:3px; align-items:center;
+              padding:1px 0; min-height:26px; }
+.cal-logos img { width:22px; height:22px; object-fit:contain; border-radius:2px; }
+.cal-empty  { color:rgba(128,128,128,0.35); font-size:0.82rem; }
+.cal-promo  { font-size:0.75rem; line-height:1.4; }
+.cal-month  { font-size:1.0rem; font-weight:700; margin-top:10px; margin-bottom:0px;
+              padding-bottom:3px; border-bottom:2px solid rgba(128,128,128,0.25); }
+/* Make date buttons look like plain links */
+div[data-testid="stButton"] > button {
+    background: none !important;
+    border: none !important;
+    padding: 0 !important;
+    color: inherit !important;
+    font-weight: 600 !important;
+    font-size: 0.82rem !important;
+    text-align: left !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    min-height: unset !important;
+    height: auto !important;
+    line-height: 1.4 !important;
+}
+div[data-testid="stButton"] > button:hover {
+    color: #e8a800 !important;
+    text-decoration: underline !important;
+    background: none !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+def logos_html(day_matches, sport_filter, custom_order=None):
+    """Returns inline HTML string of league logos for a sport column."""
+    from shared import get_custom_league_order
+    order = custom_order if custom_order is not None else get_custom_league_order()
+
+    def match_priority(m):
+        key = (m.get("_src", "espn"), m.get("_code", ""))
+        try:    return order.index(key)
+        except: return len(order)
+
+    filtered = sorted(
+        [m for m in day_matches if get_match_sport(m) == sport_filter],
+        key=match_priority
+    )
+    seen, parts = set(), []
+    for m in filtered:
+        league = m["Διοργάνωση"]
+        logo   = m.get("League Logo", "")
+        if league in seen: continue
+        seen.add(league)
+        if logo:
+            parts.append(f'<img src="{logo}" title="{league}" onerror="this.remove()">')
+        else:
+            parts.append(f'<span title="{league}" style="font-size:0.8rem">🏆</span>')
+    if parts:
+        return f'<div class="cal-logos">{"".join(parts)}</div>'
+    return '<div class="cal-logos"><span class="cal-empty">—</span></div>'
+
+def promo_html(day_promos):
+    if not day_promos:
+        return '<span class="cal-empty">—</span>'
+    parts = []
+    for p in day_promos:
+        label = p.get("match") or p.get("championship") or p.get("other") or "—"
+        icon  = "🏟️" if p.get("match") else ("🏆" if p.get("championship") else "📝")
+        short = label[:40] + ("…" if len(label) > 40 else "")
+        parts.append(f'<span class="cal-promo"><b>{p["type"]}</b> {icon} {short}</span>')
+    return "<br>".join(parts)
+
+# ── render ──
 current_month = None
 
+# Track if user clicked a date button this render pass
+_nav_target = None
+
 for i in range(num_days):
-    d         = start_date + timedelta(days=i)
-    date_str  = d.strftime("%d/%m/%Y")
-    day_name  = day_names_gr_short[d.weekday()]
+    d        = start_date + timedelta(days=i)
+    date_str = d.strftime("%d/%m/%Y")
+    day_name = day_names_gr_short[d.weekday()]
+    is_today = (d == effective_today)
     month_key = (d.month, d.year)
 
+    # Month header
     if month_key != current_month:
         current_month = month_key
-        if html_rows:
-            html_rows.append("</tbody></table>")
-        html_rows.append(
-            f'<div class="month-hdr">{month_names_gr[d.month-1]} {d.year}</div>'
-            f'<table><thead><tr>'
-            f'<th class="h-date">Ημερομηνία</th>'
-            f'<th class="h-soccer">⚽ Ποδόσφαιρο</th>'
-            f'<th class="h-basket">🏀 Μπάσκετ</th>'
-            f'<th class="h-tennis">🎾 Τένις</th>'
-            f'<th class="h-hockey">🏒 Χόκεϊ</th>'
-            f'<th class="h-promo">📋 Promos</th>'
-            f'</tr></thead><tbody>'
-        )
+        st.markdown(f'<div class="cal-month">{month_names_gr[d.month-1]} {d.year}</div>', unsafe_allow_html=True)
+        # Column headers
+        h_cols = st.columns(COL_W)
+        headers = ["Ημερομηνία", "⚽ Ποδόσφαιρο", "🏀 Μπάσκετ", "🎾 Τένις", "🏒 Χόκεϊ", "📋 Promos"]
+        for hc, ht in zip(h_cols, headers):
+            hc.markdown(f'<div class="cal-header">{ht}</div>', unsafe_allow_html=True)
 
     day_matches = matches_by_date.get(d, [])
     day_promos  = promos_by_date.get(date_str, [])
-    is_today    = (d == effective_today)
-    nav_iso     = d.strftime("%Y-%m-%d")
 
-    today_badge  = '<span class="badge">ΣΗΜΕΡΑ</span>' if is_today else ""
-    onclick_js   = f"window.parent.location.href = window.parent.location.href.replace(/\\/Calendar_View[^?#]*/, '') + '?cal_nav={nav_iso}';"
-    date_cell    = f'<a href="#" class="dlink" onclick="{onclick_js} return false;">{d.day}/{d.month} {day_name}{today_badge}</a>'
+    row_cols = st.columns(COL_W)
 
-    s_html = sport_logos_html(day_matches, "soccer",      custom_order)
-    b_html = sport_logos_html(day_matches, "basketball",  custom_order)
-    t_html = sport_logos_html(day_matches, "tennis",      custom_order)
-    h_html = sport_logos_html(day_matches, "hockey",      custom_order)
+    # Date column — st.button so it navigates properly
+    with row_cols[0]:
+        badge = " 🟡" if is_today else ""
+        label = f"{d.day}/{d.month} {day_name}{badge}"
+        if st.button(label, key=f"cal_btn_{i}", use_container_width=True):
+            st.session_state.selected_date = d
+            st.switch_page("sportsbook_dashboard.py")
 
-    if day_promos:
-        p_parts = []
-        for p in day_promos:
-            label = p.get("match") or p.get("championship") or p.get("other") or "—"
-            icon  = "🏟️" if p.get("match") else ("🏆" if p.get("championship") else "📝")
-            short = label[:45] + ("…" if len(label) > 45 else "")
-            p_parts.append(f"<b>{p['type']}</b> {icon} <span class='pl'>{short}</span>")
-        promo_html = "<br>".join(p_parts)
-    else:
-        promo_html = '<span class="empty">—</span>'
+    # Sports columns
+    for col, sport in zip(row_cols[1:5], ["soccer", "basketball", "tennis", "hockey"]):
+        col.markdown(logos_html(day_matches, sport, custom_order), unsafe_allow_html=True)
 
-    row_cls = "today" if is_today else ""
-    html_rows.append(
-        f'<tr class="{row_cls}">'
-        f'<td class="c-date">{date_cell}</td>'
-        f'<td class="c-soccer">{s_html}</td>'
-        f'<td class="c-basket">{b_html}</td>'
-        f'<td class="c-tennis">{t_html}</td>'
-        f'<td class="c-hockey">{h_html}</td>'
-        f'<td class="c-promo">{promo_html}</td>'
-        f'</tr>'
-    )
+    # Promos column
+    row_cols[5].markdown(promo_html(day_promos), unsafe_allow_html=True)
 
-html_rows.append("</tbody></table>")
+    # Thin separator line between days
+    if i < num_days - 1:
+        st.markdown('<hr style="margin:0;border:none;border-top:1px solid rgba(128,128,128,0.08);">', unsafe_allow_html=True)
 
-full_html = """<!DOCTYPE html>
-<html>
-<head>
-<style>
-  body { margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,sans-serif; font-size:0.82rem; color:inherit; }
-  .month-hdr {
-    font-size:1.0rem; font-weight:700;
-    margin-top:12px; margin-bottom:2px; padding-bottom:2px;
-    border-bottom:2px solid rgba(128,128,128,0.25);
-  }
-  table { width:100%; border-collapse:collapse; table-layout:fixed; margin-bottom:2px; }
-  th {
-    font-size:0.7rem; color:rgba(128,128,128,0.6); font-weight:700;
-    text-align:left; padding:3px 6px 2px;
-    border-bottom:1px solid rgba(128,128,128,0.18);
-    background:rgba(128,128,128,0.03);
-  }
-  td { padding:3px 6px; border-bottom:1px solid rgba(128,128,128,0.08); vertical-align:middle; overflow:hidden; }
-  tr:hover td { background-color:rgba(128,128,128,0.06); }
-  tr.today td { background-color:rgba(255,200,0,0.07); border-left:3px solid #e8a800; }
-
-  .h-date, .c-date { width:95px; white-space:nowrap; }
-  .h-soccer,.c-soccer { width:29%; }
-  .h-basket,.c-basket { width:12%; }
-  .h-tennis,.c-tennis { width:10%; }
-  .h-hockey,.c-hockey { width:10%; }
-  .h-promo, .c-promo  { width:26%; }
-
-  .dlink {
-    color: inherit; text-decoration: none;
-    font-weight: 600; font-size: 0.82rem;
-  }
-  .dlink:hover { color: #e8a800; text-decoration: underline; cursor: pointer; }
-
-  .badge {
-    font-size:0.6rem; background:#e8a800; color:#000;
-    border-radius:3px; padding:0 3px; margin-left:3px;
-    font-weight:700; vertical-align:middle;
-  }
-  .empty { color:rgba(128,128,128,0.35); }
-  .logos { display:flex; flex-wrap:wrap; gap:3px; align-items:center; }
-  .logos img { width:22px; height:22px; object-fit:contain; border-radius:2px; }
-  .pl { font-size:0.75rem; }
-</style>
-</head>
-<body>
-""" + "".join(html_rows) + """
-</body>
-</html>"""
-
-estimated_height = num_days * 29 + 4 * 55 + 80
-components.html(full_html, height=estimated_height, scrolling=True)
