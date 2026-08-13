@@ -137,42 +137,45 @@ st.session_state.promos = load_promos()
 # -------------------------------------------------------------
 # SIDEBAR
 # -------------------------------------------------------------
-view_col1, view_col2 = st.sidebar.columns(2)
-with view_col1:
-    if st.button("⚽ Dashboard", key="nav_dash", use_container_width=True, type="secondary"):
-        st.switch_page("sportsbook_dashboard.py")
-with view_col2:
-    if st.button("📅 Calendar", key="nav_cal", use_container_width=True, type="primary"):
-        pass
+with st.sidebar:
+    _vc1, _vc2 = st.columns(2)
+    with _vc1:
+        if st.button("⚽ Dashboard", key="nav_dash", use_container_width=True, type="secondary"):
+            st.switch_page("sportsbook_dashboard.py")
+    with _vc2:
+        if st.button("📅 Calendar", key="nav_cal", use_container_width=True, type="primary"):
+            pass
 
-if st.sidebar.button("🏆 Priority", use_container_width=True):
-    priority_dialog()
+    if st.button("🏆 Priority", use_container_width=True):
+        priority_dialog()
 
-st.sidebar.divider()
-st.sidebar.markdown("**Πλοήγηση**")
+    st.divider()
+    st.markdown("**Πλοήγηση**")
+
 if "cal_start_date" not in st.session_state:
     st.session_state.cal_start_date = effective_today
 
-nav_col1, nav_col2, nav_col3 = st.sidebar.columns([1, 1, 1])
-with nav_col1:
-    if st.button("◀ 7", key="cal_prev", use_container_width=True):
-        st.session_state.cal_start_date -= timedelta(days=7)
-        st.rerun()
-with nav_col2:
-    if st.button("📅 Σήμερα", key="cal_today", use_container_width=True):
-        st.session_state.cal_start_date = effective_today
-        st.rerun()
-with nav_col3:
-    if st.button("7 ▶", key="cal_next", use_container_width=True):
-        st.session_state.cal_start_date += timedelta(days=7)
-        st.rerun()
+with st.sidebar:
+    _nc1, _nc2, _nc3 = st.columns([1, 1, 1])
+    with _nc1:
+        if st.button("◀ 7", key="cal_prev", use_container_width=True):
+            st.session_state.cal_start_date -= timedelta(days=7)
+            st.rerun()
+    with _nc2:
+        if st.button("📅 Σήμερα", key="cal_today", use_container_width=True):
+            st.session_state.cal_start_date = effective_today
+            st.rerun()
+    with _nc3:
+        if st.button("7 ▶", key="cal_next", use_container_width=True):
+            st.session_state.cal_start_date += timedelta(days=7)
+            st.rerun()
 
-st.sidebar.divider()
-promo_count = len(st.session_state.promos)
-if st.sidebar.button("➕ Add Promo", use_container_width=True):
-    add_promo_dialog_cal()
-if st.sidebar.button(f"👁 Promos ({promo_count})" if promo_count else "👁 Promos", use_container_width=True):
-    view_promos_dialog_cal()
+    st.divider()
+    promo_count = len(st.session_state.promos)
+    if st.button("➕ Add Promo", use_container_width=True):
+        add_promo_dialog_cal()
+    if st.button(f"👁 Promos ({promo_count})" if promo_count else "👁 Promos", use_container_width=True):
+        view_promos_dialog_cal()
 
 # -------------------------------------------------------------
 # MAIN
@@ -272,29 +275,35 @@ COL_W = [1.1, 3.2, 1.3, 1.0, 1.0, 2.6]
 st.markdown("""
 <style>
 /* Calendar table styling */
-.cal-header { font-size:0.7rem; color:rgba(128,128,128,0.6); font-weight:700;
-              padding:2px 0; border-bottom:1px solid rgba(128,128,128,0.18); }
-.cal-logos  { display:flex; flex-wrap:wrap; gap:3px; align-items:center;
-              padding:1px 0; min-height:26px; }
-.cal-logos img { width:22px; height:22px; object-fit:contain; border-radius:2px; }
-.cal-empty  { color:rgba(128,128,128,0.35); font-size:0.82rem; }
-.cal-promo  { font-size:0.75rem; line-height:1.4; }
-.cal-month  { font-size:1.0rem; font-weight:700; margin-top:10px; margin-bottom:0px;
-              padding-bottom:3px; border-bottom:2px solid rgba(128,128,128,0.25); }
-/* Make date buttons look like plain links */
+.cal-header { font-size:0.68rem; color:rgba(128,128,128,0.6); font-weight:700;
+              padding:1px 0 2px; border-bottom:1px solid rgba(128,128,128,0.18); }
+.cal-logos  { display:flex; flex-wrap:wrap; gap:2px; align-items:center;
+              padding:0; min-height:20px; }
+.cal-logos img { width:18px; height:18px; object-fit:contain; border-radius:2px; }
+.cal-empty  { color:rgba(128,128,128,0.35); font-size:0.75rem; }
+.cal-promo  { font-size:0.72rem; line-height:1.3; }
+.cal-month  { font-size:0.95rem; font-weight:700; margin-top:8px; margin-bottom:0px;
+              padding-bottom:2px; border-bottom:2px solid rgba(128,128,128,0.25); }
+/* Shrink all streamlit element containers to remove vertical gaps */
+div[data-testid="stVerticalBlockBorderWrapper"],
+div[data-testid="stVerticalBlock"] { gap: 0rem !important; }
+div[data-testid="column"] { padding: 0 2px !important; }
+div[data-testid="stMarkdown"] { margin-bottom: 0 !important; line-height: 1; }
+hr { margin: 0 !important; }
+/* Date buttons — look like plain links, tight height */
 div[data-testid="stButton"] > button {
     background: none !important;
     border: none !important;
-    padding: 0 !important;
+    padding: 1px 0 !important;
     color: inherit !important;
     font-weight: 600 !important;
-    font-size: 0.82rem !important;
+    font-size: 0.78rem !important;
     text-align: left !important;
     box-shadow: none !important;
     width: 100% !important;
     min-height: unset !important;
     height: auto !important;
-    line-height: 1.4 !important;
+    line-height: 1.3 !important;
 }
 div[data-testid="stButton"] > button:hover {
     color: #e8a800 !important;
@@ -386,7 +395,5 @@ for i in range(num_days):
     # Promos column
     row_cols[5].markdown(promo_html(day_promos), unsafe_allow_html=True)
 
-    # Thin separator line between days
-    if i < num_days - 1:
-        st.markdown('<hr style="margin:0;border:none;border-top:1px solid rgba(128,128,128,0.08);">', unsafe_allow_html=True)
+    # Thin separator between days via CSS only (no extra markdown element)
 
