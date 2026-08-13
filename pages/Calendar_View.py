@@ -225,12 +225,26 @@ def get_match_sport(match):
         return "tennis"
     return "soccer"
 
-def sport_logos_html(day_matches, sport_filter):
+def sport_logos_html(day_matches, sport_filter, custom_order=None):
+    # Build league→priority lookup from custom_order
+    from shared import LEAGUE_DISPLAY_ORDER, get_custom_league_order
+    order = custom_order if custom_order is not None else get_custom_league_order()
+
+    def match_priority(m):
+        src      = m.get("_src", "espn")
+        code     = m.get("_code", "")
+        key      = (src, code)
+        try:
+            return order.index(key)
+        except ValueError:
+            return len(order)
+
+    filtered = [m for m in day_matches if get_match_sport(m) == sport_filter]
+    filtered.sort(key=match_priority)
+
     seen  = set()
     parts = []
-    for m in day_matches:
-        if get_match_sport(m) != sport_filter:
-            continue
+    for m in filtered:
         league = m["Διοργάνωση"]
         logo   = m.get("League Logo", "")
         if league in seen:
@@ -285,10 +299,10 @@ for i in range(num_days):
     onclick_js   = f"window.parent.location.href = window.parent.location.href.replace(/\\/Calendar_View[^?#]*/, '') + '?cal_nav={nav_iso}';"
     date_cell    = f'<a href="#" class="dlink" onclick="{onclick_js} return false;">{d.day}/{d.month} {day_name}{today_badge}</a>'
 
-    s_html = sport_logos_html(day_matches, "soccer")
-    b_html = sport_logos_html(day_matches, "basketball")
-    t_html = sport_logos_html(day_matches, "tennis")
-    h_html = sport_logos_html(day_matches, "hockey")
+    s_html = sport_logos_html(day_matches, "soccer",      custom_order)
+    b_html = sport_logos_html(day_matches, "basketball",  custom_order)
+    t_html = sport_logos_html(day_matches, "tennis",      custom_order)
+    h_html = sport_logos_html(day_matches, "hockey",      custom_order)
 
     if day_promos:
         p_parts = []
