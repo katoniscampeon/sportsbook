@@ -22,6 +22,10 @@ st.markdown("""
         .block-container {padding-top: 1rem; padding-bottom: 0rem;}
         [data-testid="stSidebarNav"] { display: none !important; }
         [data-testid="stSidebarContent"] { padding-top: 1rem !important; }
+        /* Sidebar buttons — match dashboard style */
+        section[data-testid="stSidebar"] .stButton > button {
+            margin-bottom: 2px;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -277,35 +281,35 @@ st.markdown("""
 /* Calendar table styling */
 .cal-header { font-size:0.68rem; color:rgba(128,128,128,0.6); font-weight:700;
               padding:1px 0 2px; border-bottom:1px solid rgba(128,128,128,0.18); }
-.cal-logos  { display:flex; flex-wrap:wrap; gap:2px; align-items:center;
-              padding:0; min-height:20px; }
-.cal-logos img { width:18px; height:18px; object-fit:contain; border-radius:2px; }
+.cal-logos  { display:flex; flex-wrap:wrap; gap:3px; align-items:center;
+              padding:2px 0; min-height:26px; }
+.cal-logos img { width:22px; height:22px; object-fit:contain; border-radius:2px; }
 .cal-empty  { color:rgba(128,128,128,0.35); font-size:0.75rem; }
 .cal-promo  { font-size:0.72rem; line-height:1.3; }
 .cal-month  { font-size:0.95rem; font-weight:700; margin-top:8px; margin-bottom:0px;
               padding-bottom:2px; border-bottom:2px solid rgba(128,128,128,0.25); }
-/* Row spacing — enough gap to breathe, not too much */
+/* Row spacing */
 div[data-testid="stVerticalBlockBorderWrapper"],
-div[data-testid="stVerticalBlock"] { gap: 0.15rem !important; }
-div[data-testid="column"] { padding: 0 2px !important; }
+div[data-testid="stVerticalBlock"] { gap: 0.35rem !important; }
+div[data-testid="column"] { padding: 0 3px !important; }
 div[data-testid="stMarkdown"] { margin-bottom: 0 !important; line-height: 1; }
 hr { margin: 0 !important; }
-/* Date buttons — look like plain links, tight height */
-div[data-testid="stButton"] > button {
+/* Date buttons — plain link style matching dashboard */
+section:not([data-testid="stSidebar"]) div[data-testid="stButton"] > button {
     background: none !important;
     border: none !important;
-    padding: 1px 0 !important;
+    padding: 4px 0 !important;
     color: inherit !important;
     font-weight: 600 !important;
-    font-size: 0.78rem !important;
+    font-size: 0.82rem !important;
     text-align: left !important;
     box-shadow: none !important;
     width: 100% !important;
-    min-height: unset !important;
+    min-height: 32px !important;
     height: auto !important;
-    line-height: 1.3 !important;
+    line-height: 1.5 !important;
 }
-div[data-testid="stButton"] > button:hover {
+section:not([data-testid="stSidebar"]) div[data-testid="stButton"] > button:hover {
     color: #e8a800 !important;
     text-decoration: underline !important;
     background: none !important;
