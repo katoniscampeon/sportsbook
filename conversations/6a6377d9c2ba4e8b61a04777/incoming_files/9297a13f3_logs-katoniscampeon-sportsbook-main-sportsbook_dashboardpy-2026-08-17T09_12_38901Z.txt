@@ -1,0 +1,11 @@
+
+[     UTC     ] Logs for campeonsportsbook.streamlit.app/
+────────────────────────────────────────────────────────────────────────────────────────
+[09:10:43] 🚀 Starting up repository: 'sportsbook', branch: 'main', main module: 'sportsbook_dashboard.py'
+[09:10:43] 🐙 Cloning repository...
+[09:10:47] 🐙 Failed
+[09:10:57] 🐙 Failed
+[09:11:07] 🐙 Failed
+[09:11:17] 🐙 Failed
+[09:11:27] 🐙 Failed to download the sources for repository: 'sportsbook', branch: 'main', main module: 'sportsbook_dashboard.py'
+[09:11:27] 🐙 Make sure the repository and the branch exist and you have write access to it, and then reboot the app.
