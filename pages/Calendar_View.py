@@ -284,9 +284,9 @@ st.markdown("""
 .cal-promo  { font-size:0.72rem; line-height:1.3; }
 .cal-month  { font-size:0.95rem; font-weight:700; margin-top:8px; margin-bottom:0px;
               padding-bottom:2px; border-bottom:2px solid rgba(128,128,128,0.25); }
-/* Shrink all streamlit element containers to remove vertical gaps */
+/* Row spacing — enough gap to breathe, not too much */
 div[data-testid="stVerticalBlockBorderWrapper"],
-div[data-testid="stVerticalBlock"] { gap: 0rem !important; }
+div[data-testid="stVerticalBlock"] { gap: 0.15rem !important; }
 div[data-testid="column"] { padding: 0 2px !important; }
 div[data-testid="stMarkdown"] { margin-bottom: 0 !important; line-height: 1; }
 hr { margin: 0 !important; }
